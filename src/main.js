@@ -1,6 +1,6 @@
 'use strict'
 
-const { app, BrowserWindow, Menu, Notification, Tray, dialog, ipcMain, shell, nativeImage } = require('electron')
+const { app, BrowserWindow, Menu, Notification, Tray, dialog, ipcMain, shell, nativeImage, nativeTheme } = require('electron')
 const { spawn, spawnSync } = require('child_process')
 const fs = require('fs')
 const http = require('http')
@@ -446,6 +446,13 @@ function createSetupWindow() {
   setupWin.loadFile(path.join(__dirname, 'setup.html'))
 }
 
+/** Title bar overlay colors matching the current system light/dark theme. */
+function overlayColors() {
+  return nativeTheme.shouldUseDarkColors
+    ? { color: '#1a1b1e', symbolColor: '#c9cdd3', height: 34 }
+    : { color: '#f7f7f8', symbolColor: '#555555', height: 34 }
+}
+
 function createMainWindow() {
   const saved = readState().windowBounds || {}
   mainWin = new BrowserWindow({
@@ -456,7 +463,7 @@ function createMainWindow() {
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
-    titleBarOverlay: isMac ? undefined : { color: '#f7f7f8', symbolColor: '#555555', height: 34 },
+    titleBarOverlay: isMac ? undefined : overlayColors(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -464,6 +471,13 @@ function createMainWindow() {
   })
   if (saved.maximized) mainWin.maximize()
   mainWin.setMenuBarVisibility(false)
+  if (!isMac) {
+    const applyOverlay = () => {
+      if (mainWin && !mainWin.isDestroyed()) mainWin.setTitleBarOverlay(overlayColors())
+    }
+    nativeTheme.on('updated', applyOverlay)
+    mainWin.on('closed', () => nativeTheme.removeListener('updated', applyOverlay))
+  }
   mainWin.webContents.on('did-finish-load', () => {
     mainWin.webContents.insertCSS(
       'body::before{content:"";position:fixed;top:0;left:0;right:140px;height:10px;z-index:2147483647;-webkit-app-region:drag;}',
