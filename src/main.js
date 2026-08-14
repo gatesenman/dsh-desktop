@@ -399,9 +399,10 @@ async function startServer(nodeDir) {
   })
   serverProc.stdout.on('data', (b) => log(b.toString().trim()))
   serverProc.stderr.on('data', (b) => log(b.toString().trim()))
+  const proc = serverProc
   serverProc.on('exit', (code) => {
-    serverProc = null
-    if (!quitting) {
+    if (serverProc === proc) serverProc = null
+    if (!quitting && !proc.expectedExit) {
       dialog.showErrorBox('dsh web 服务已退出', `退出码：${code}。请重启应用。`)
     }
   })
@@ -412,6 +413,7 @@ async function startServer(nodeDir) {
 function stopServer() {
   if (serverProc) {
     const proc = serverProc
+    proc.expectedExit = true
     serverProc = null
     try {
       if (isWin) spawnSync('taskkill', ['/pid', String(proc.pid), '/t', '/f'])
@@ -592,6 +594,26 @@ async function manualDshUpdate() {
   }
 }
 
+let restarting = false
+
+/** Restarts the embedded dsh web service and reloads the main window. */
+async function restartService() {
+  if (restarting || updating) return { status: 'busy' }
+  restarting = true
+  try {
+    log('手动重启服务...')
+    stopServer()
+    await startServer(activeNodeDir)
+    if (mainWin && !mainWin.isDestroyed()) mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
+    log('服务重启完成')
+    return { status: 'restarted' }
+  } catch (e) {
+    return { status: 'error', message: e.message }
+  } finally {
+    restarting = false
+  }
+}
+
 function createTray() {
   const image = nativeImage.createFromPath(path.join(__dirname, 'tray.png'))
   tray = new Tray(image)
@@ -602,6 +624,7 @@ function createTray() {
       { label: '设置', click: createSettingsWindow },
       { label: '检查 dsh 更新', click: () => manualDshUpdate() },
       { label: '查看控制台日志', click: createLogsWindow },
+      { label: '重启服务', click: () => restartService() },
       { label: '在浏览器中打开', click: () => shell.openExternal(`http://127.0.0.1:${serverPort}/`) },
       { type: 'separator' },
       {
@@ -682,6 +705,7 @@ ipcMain.handle('set-settings', (_e, settings) => {
 ipcMain.handle('manual-update', () => manualDshUpdate())
 ipcMain.handle('open-data-dir', () => shell.openPath(userDir()))
 ipcMain.handle('open-logs', () => createLogsWindow())
+ipcMain.handle('restart-service', () => restartService())
 ipcMain.handle('get-logs', () => logBuffer.slice())
 ipcMain.handle('export-logs', async () => {
   const { canceled, filePath } = await dialog.showSaveDialog(logsWin, {

@@ -20,6 +20,16 @@ $('dataDirBtn').addEventListener('click', () => window.dshDesktop.openDataDir())
 
 $('logsBtn').addEventListener('click', () => window.dshDesktop.openLogs())
 
+$('restartBtn').addEventListener('click', async () => {
+  $('restartBtn').disabled = true
+  setUpdateStatus('正在重启服务...')
+  const result = await window.dshDesktop.restartService()
+  if (result.status === 'restarted') setUpdateStatus('服务已重启', 'ok')
+  else if (result.status === 'busy') setUpdateStatus('已有任务在进行中')
+  else setUpdateStatus(`重启失败：${result.message}`, 'err')
+  $('restartBtn').disabled = false
+})
+
 function setUpdateStatus(text, kind) {
   const el = $('updateStatus')
   el.textContent = text

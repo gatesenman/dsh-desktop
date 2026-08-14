@@ -53,7 +53,8 @@
     }
     input:checked + .slider { background: var(--accent); }
     input:checked + .slider:before { transform: translateX(18px); }
-    .actions { display: flex; gap: 10px; align-items: center; padding: 13px 0; }
+    .actions { display: flex; gap: 10px; align-items: center; padding: 13px 0; flex-wrap: wrap; }
+    .actions button { white-space: nowrap; }
     button {
       background: var(--accent); color: #fff; border: none; border-radius: 8px;
       padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 500;
@@ -109,6 +110,7 @@
     </div>
     <div class="actions">
       <button id="updateBtn">立即检查并更新 dsh</button>
+      <button id="restartBtn" class="secondary">重启服务</button>
       <button id="dataDirBtn" class="secondary">打开数据目录</button>
       <button id="logsBtn" class="secondary">查看控制台日志</button>
     </div>
