@@ -12,7 +12,7 @@
 
 ![首次启动安装 / First-launch setup](assets/setup.png)
 
-内嵌 Web UI，无菜单栏工具条 / Embedded Web UI, no menu bar or toolbar:
+内嵌 Web UI，无标题栏/菜单栏，沉浸式窗口 / Embedded Web UI, frameless immersive window:
 
 ![主窗口 / Main window](assets/main-window.png)
 
@@ -36,7 +36,7 @@
 
 - **首次启动自动配置环境**：自动检测系统 Node.js（需要 22.19+ 或 24+）；没有的话自动下载内置 Node.js 运行时，然后自动安装 `@deepseek-ai/dsh`，全程可视化分步进度。
 - **内嵌 Web UI**：安装完成后自动启动 `dsh web` 服务并内嵌在应用窗口中，下次启动直接进入。
-- **无干扰界面**：主窗口无菜单栏/工具条，并记住窗口大小、位置和最大化状态。
+- **无干扰界面**：主窗口无标题栏、无菜单栏/工具条（沉浸式窗口，保留原生窗口控制按钮），并记住窗口大小、位置和最大化状态。
 - **系统托盘**：关闭窗口可最小化到托盘继续运行（首次会有系统通知提示），托盘菜单支持显示窗口、设置、检查更新、在浏览器中打开和退出。
 - **系统设置**：开机自动启动、关闭窗口时最小化到托盘、启动时自动更新 dsh，均可在设置窗口中开关；可一键打开数据目录。
 - **更新**：手动点击「立即检查并更新 dsh」后台执行安装并自动重启服务；开启自动更新后每次启动自动升级 `@deepseek-ai/dsh`；应用本身通过 GitHub Releases 自动更新（electron-updater）。
@@ -81,7 +81,7 @@ An unofficial desktop app for [DeepSeek Harness (dsh)](https://github.com/deepse
 
 - **Automatic environment setup on first launch**: detects system Node.js (requires 22.19+ or 24+); if missing, downloads a bundled Node.js runtime, then installs `@deepseek-ai/dsh` automatically, with step-by-step visual progress.
 - **Embedded Web UI**: starts the `dsh web` service and embeds it in the app window; subsequent launches go straight in.
-- **Distraction-free UI**: no menu bar / toolbar on the main window; window size, position, and maximized state are remembered.
+- **Distraction-free UI**: frameless main window with no title bar, menu bar, or toolbar (native window controls kept); window size, position, and maximized state are remembered.
 - **System tray**: closing the window can minimize to tray and keep the service running (a one-time system notification explains this); the tray menu supports show window, settings, check for updates, open in browser, and quit.
 - **System settings**: launch at login, minimize to tray on close, and auto-update dsh on startup — all toggleable in the settings window; one click opens the data directory.
 - **Updates**: manual "Check and update dsh" runs the install in the background and restarts the service; when auto-update is on, `@deepseek-ai/dsh` is upgraded on every launch; the app itself auto-updates via GitHub Releases (electron-updater).

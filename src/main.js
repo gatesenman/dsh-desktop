@@ -446,6 +446,8 @@ function createMainWindow() {
     y: saved.y,
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: isMac ? undefined : { color: '#f7f7f8', symbolColor: '#555555', height: 34 },
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -453,6 +455,11 @@ function createMainWindow() {
   })
   if (saved.maximized) mainWin.maximize()
   mainWin.setMenuBarVisibility(false)
+  mainWin.webContents.on('did-finish-load', () => {
+    mainWin.webContents.insertCSS(
+      'body::before{content:"";position:fixed;top:0;left:0;right:140px;height:10px;z-index:2147483647;-webkit-app-region:drag;}',
+    )
+  })
   mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
   mainWin.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
