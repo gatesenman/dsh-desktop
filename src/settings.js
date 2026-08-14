@@ -18,6 +18,8 @@ for (const k of keys) {
 
 $('dataDirBtn').addEventListener('click', () => window.dshDesktop.openDataDir())
 
+$('logsBtn').addEventListener('click', () => window.dshDesktop.openLogs())
+
 function setUpdateStatus(text, kind) {
   const el = $('updateStatus')
   el.textContent = text

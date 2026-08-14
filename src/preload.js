@@ -13,4 +13,8 @@ contextBridge.exposeInMainWorld('dshDesktop', {
   setSettings: (settings) => ipcRenderer.invoke('set-settings', settings),
   manualUpdate: () => ipcRenderer.invoke('manual-update'),
   openDataDir: () => ipcRenderer.invoke('open-data-dir'),
+  openLogs: () => ipcRenderer.invoke('open-logs'),
+  getLogs: () => ipcRenderer.invoke('get-logs'),
+  exportLogs: () => ipcRenderer.invoke('export-logs'),
+  onAppLog: (cb) => ipcRenderer.on('app-log', (_e, line) => cb(line)),
 })

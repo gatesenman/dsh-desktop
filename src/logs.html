@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; img-src 'self'" />
+  <title>控制台日志 — DSH Desktop</title>
+  <style>
+    :root { --accent: #2B6CEA; }
+    body {
+      margin: 0;
+      font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #21262d;
+      flex: none;
+    }
+    .toolbar h1 { font-size: 15px; margin: 0 auto 0 0; font-weight: 600; }
+    button {
+      background: #21262d; color: #e6edf3; border: 1px solid #30363d; border-radius: 8px;
+      padding: 6px 14px; font-size: 13px; cursor: pointer;
+    }
+    button:hover { filter: brightness(1.2); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    #status { font-size: 12px; color: #8b949e; }
+    #log {
+      flex: 1;
+      overflow: auto;
+      margin: 0;
+      padding: 12px 16px;
+      font-family: ui-monospace, "SF Mono", Consolas, Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-all;
+      user-select: text;
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>控制台日志</h1>
+    <span id="status"></span>
+    <button id="copyBtn">复制全部</button>
+    <button id="exportBtn" class="primary">导出日志</button>
+  </div>
+  <pre id="log"></pre>
+  <script src="logs.js"></script>
+</body>
+</html>

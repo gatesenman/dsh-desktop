@@ -16,9 +16,13 @@
 
 ![主窗口 / Main window](assets/main-window.png)
 
-设置与手动更新（开机自启、最小化到托盘、自动更新、检查并更新 dsh、打开数据目录） / Settings & manual update:
+设置与手动更新（开机自启、最小化到托盘、自动更新、检查并更新 dsh、打开数据目录、查看日志） / Settings & manual update:
 
 ![设置 / Settings](assets/settings.png)
+
+控制台日志（实时查看、复制、导出） / Console logs (live view, copy, export):
+
+![控制台日志 / Console logs](assets/logs.png)
 
 ---
 
@@ -39,6 +43,7 @@
 - **无干扰界面**：主窗口无标题栏、无菜单栏/工具条（沉浸式窗口，保留原生窗口控制按钮），并记住窗口大小、位置和最大化状态。
 - **系统托盘**：关闭窗口可最小化到托盘继续运行（首次会有系统通知提示），托盘菜单支持显示窗口、设置、检查更新、在浏览器中打开和退出。
 - **系统设置**：开机自动启动、关闭窗口时最小化到托盘、启动时自动更新 dsh，均可在设置窗口中开关；可一键打开数据目录。
+- **控制台日志**：设置或托盘菜单可打开日志窗口，实时查看应用与 dsh 服务运行日志，支持一键复制和导出到文件。
 - **更新**：手动点击「立即检查并更新 dsh」后台执行安装并自动重启服务；开启自动更新后每次启动自动升级 `@deepseek-ai/dsh`；应用本身通过 GitHub Releases 自动更新（electron-updater）。
 
 ## 下载安装
@@ -84,6 +89,7 @@ An unofficial desktop app for [DeepSeek Harness (dsh)](https://github.com/deepse
 - **Distraction-free UI**: frameless main window with no title bar, menu bar, or toolbar (native window controls kept); window size, position, and maximized state are remembered.
 - **System tray**: closing the window can minimize to tray and keep the service running (a one-time system notification explains this); the tray menu supports show window, settings, check for updates, open in browser, and quit.
 - **System settings**: launch at login, minimize to tray on close, and auto-update dsh on startup — all toggleable in the settings window; one click opens the data directory.
+- **Console logs**: open the log window from settings or the tray menu to watch app and dsh service logs live, with one-click copy and export to file.
 - **Updates**: manual "Check and update dsh" runs the install in the background and restarts the service; when auto-update is on, `@deepseek-ai/dsh` is upgraded on every launch; the app itself auto-updates via GitHub Releases (electron-updater).
 
 ## Download

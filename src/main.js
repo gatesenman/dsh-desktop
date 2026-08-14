@@ -17,6 +17,7 @@ const isMac = process.platform === 'darwin'
 let setupWin = null
 let mainWin = null
 let settingsWin = null
+let logsWin = null
 let tray = null
 let serverProc = null
 let serverPort = null
@@ -69,6 +70,7 @@ function writeState(state) {
   fs.writeFileSync(statePath(), JSON.stringify(state, null, 2))
 }
 
+const LOG_LIMIT = 5000
 const logBuffer = []
 let lastStatus = '正在准备...'
 let lastStep = 0
@@ -91,9 +93,14 @@ function setProgress(pct) {
 
 function log(message) {
   console.log('[dsh-desktop]', message)
-  logBuffer.push(message)
+  const line = `[${new Date().toLocaleTimeString('en-GB')}] ${message}`
+  logBuffer.push(line)
+  if (logBuffer.length > LOG_LIMIT) logBuffer.splice(0, logBuffer.length - LOG_LIMIT)
   if (setupWin && !setupWin.isDestroyed()) {
     setupWin.webContents.send('setup-log', message)
+  }
+  if (logsWin && !logsWin.isDestroyed()) {
+    logsWin.webContents.send('app-log', line)
   }
 }
 
@@ -527,6 +534,30 @@ function createSettingsWindow() {
   })
 }
 
+function createLogsWindow() {
+  if (logsWin && !logsWin.isDestroyed()) {
+    logsWin.show()
+    logsWin.focus()
+    return
+  }
+  logsWin = new BrowserWindow({
+    width: 860,
+    height: 620,
+    icon: path.join(__dirname, 'icon.png'),
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+  logsWin.setMenuBarVisibility(false)
+  logsWin.loadFile(path.join(__dirname, 'logs.html'))
+  logsWin.on('closed', () => {
+    logsWin = null
+  })
+}
+
 function sendUpdateEvent(payload) {
   for (const win of [settingsWin, setupWin]) {
     if (win && !win.isDestroyed()) win.webContents.send('update-event', payload)
@@ -570,6 +601,7 @@ function createTray() {
       { label: '显示主窗口', click: showMainWindow },
       { label: '设置', click: createSettingsWindow },
       { label: '检查 dsh 更新', click: () => manualDshUpdate() },
+      { label: '查看控制台日志', click: createLogsWindow },
       { label: '在浏览器中打开', click: () => shell.openExternal(`http://127.0.0.1:${serverPort}/`) },
       { type: 'separator' },
       {
@@ -649,6 +681,18 @@ ipcMain.handle('set-settings', (_e, settings) => {
 })
 ipcMain.handle('manual-update', () => manualDshUpdate())
 ipcMain.handle('open-data-dir', () => shell.openPath(userDir()))
+ipcMain.handle('open-logs', () => createLogsWindow())
+ipcMain.handle('get-logs', () => logBuffer.slice())
+ipcMain.handle('export-logs', async () => {
+  const { canceled, filePath } = await dialog.showSaveDialog(logsWin, {
+    title: '导出日志',
+    defaultPath: path.join(app.getPath('downloads'), `dsh-desktop-${Date.now()}.log`),
+    filters: [{ name: 'Log', extensions: ['log', 'txt'] }],
+  })
+  if (canceled || !filePath) return { status: 'canceled' }
+  fs.writeFileSync(filePath, logBuffer.join('\n') + '\n')
+  return { status: 'saved', filePath }
+})
 
 app.on('before-quit', () => {
   quitting = true
