@@ -10,7 +10,7 @@
 
 [DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness) 的非官方桌面版，支持 macOS / Windows / Linux。
 
-> **来源与技术说明**：本项目内容来源于官方站点 / 官方仓库 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（官方使用方式为 `npx @deepseek-ai/dsh web`），通过 **Electron + electron-builder** 打包为桌面应用，应用内嵌官方 `dsh web` 服务的 Web UI；logo 为 DeepSeek 官方 logo，版权归 DeepSeek 所有。
+> **来源与技术说明**：本项目内容来源于官方站点 / 官方仓库 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（官方使用方式为 `npx @deepseek-ai/dsh web`），通过 **Electron + electron-builder** 打包为桌面应用，应用内嵌官方 `dsh web` 服务的 Web UI；logo 为 DeepSeek 官方 logo。
 
 等价于 `npx @deepseek-ai/dsh web`，但打包成了开箱即用的桌面应用：
 
@@ -75,7 +75,7 @@ MIT
 
 An unofficial desktop app for [DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness), supporting macOS / Windows / Linux.
 
-> **Source & tech notes**: The content comes from the official site / official repository [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) (officially used via `npx @deepseek-ai/dsh web`). It is packaged as a desktop app with **Electron + electron-builder**, embedding the official `dsh web` service's Web UI. The logo is the official DeepSeek logo, copyright belongs to DeepSeek.
+> **Source & tech notes**: The content comes from the official site / official repository [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) (officially used via `npx @deepseek-ai/dsh web`). It is packaged as a desktop app with **Electron + electron-builder**, embedding the official `dsh web` service's Web UI. The logo is the official DeepSeek logo.
 
 Equivalent to `npx @deepseek-ai/dsh web`, but packaged as a ready-to-use desktop app:
 
