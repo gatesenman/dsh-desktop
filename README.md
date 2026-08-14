@@ -28,7 +28,9 @@
 
 [DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness) 的非官方桌面版，支持 macOS / Windows / Linux。
 
-> **来源与技术说明**：本项目内容来源于官方站点 / 官方仓库 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（官方使用方式为 `npx @deepseek-ai/dsh web`），通过 **Electron + electron-builder** 打包为桌面应用，应用内嵌官方 `dsh web` 服务的 Web UI。
+> **免责声明**：本项目为非官方项目，与 DeepSeek 官方无任何关联。应用图标为自制图标；“DeepSeek”“DeepSeek Harness”等名称仅用于描述兼容性，商标归其所有者所有。
+>
+> **来源与技术说明**：应用通过 npm 安装官方公开发布的 [`@deepseek-ai/dsh`](https://github.com/deepseek-ai/deepseek-harness)（官方使用方式为 `npx @deepseek-ai/dsh web`），通过 **Electron + electron-builder** 打包为桌面应用，内嵌官方 `dsh web` 服务的 Web UI，未复制或修改官方源码。
 
 ## 功能
 
@@ -71,7 +73,9 @@ Node.js 运行时、dsh 安装目录和状态文件保存在应用用户数据�
 
 An unofficial desktop app for [DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness), supporting macOS / Windows / Linux.
 
-> **Source & tech notes**: The content comes from the official site / official repository [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) (officially used via `npx @deepseek-ai/dsh web`). It is packaged as a desktop app with **Electron + electron-builder**, embedding the official `dsh web` service's Web UI.
+> **Disclaimer**: This is an unofficial project, not affiliated with or endorsed by DeepSeek. The app icon is an original design; "DeepSeek" and "DeepSeek Harness" are used only to describe compatibility, and all trademarks belong to their owners.
+>
+> **Source & tech notes**: The app installs the officially published [`@deepseek-ai/dsh`](https://github.com/deepseek-ai/deepseek-harness) package from npm (officially used via `npx @deepseek-ai/dsh web`), packaged with **Electron + electron-builder**, embedding the official `dsh web` service's Web UI. No official source code is copied or modified.
 
 ## Features
 
