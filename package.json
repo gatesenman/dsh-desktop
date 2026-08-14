@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Desktop app for DeepSeek Harness (dsh) — auto-installs and embeds the dsh Web UI",
   "main": "src/main.js",
   "author": "gatesenman <gaosichun@hotmail.com>",

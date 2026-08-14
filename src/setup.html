@@ -51,14 +51,6 @@
     <div><span class="spinner"></span><span id="status">正在准备...</span></div>
   </header>
   <div id="log"></div>
-  <script>
-    const logEl = document.getElementById('log')
-    const statusEl = document.getElementById('status')
-    window.dshDesktop.onStatus((msg) => { statusEl.textContent = msg })
-    window.dshDesktop.onLog((msg) => {
-      logEl.textContent += msg + '\n'
-      logEl.scrollTop = logEl.scrollHeight
-    })
-  </script>
+  <script src="setup.js"></script>
 </body>
 </html>

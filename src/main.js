@@ -1,6 +1,6 @@
 'use strict'
 
-const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, shell, nativeImage } = require('electron')
 const { spawn, spawnSync } = require('child_process')
 const fs = require('fs')
 const http = require('http')
@@ -16,9 +16,29 @@ const isMac = process.platform === 'darwin'
 
 let setupWin = null
 let mainWin = null
+let settingsWin = null
+let tray = null
 let serverProc = null
 let serverPort = null
+let activeNodeDir = null
+let updating = false
 let quitting = false
+
+const DEFAULT_SETTINGS = {
+  openAtLogin: false,
+  closeToTray: true,
+  autoUpdateDsh: true,
+}
+
+function readSettings() {
+  return { ...DEFAULT_SETTINGS, ...(readState().settings || {}) }
+}
+
+function writeSettings(settings) {
+  const state = readState()
+  state.settings = settings
+  writeState(state)
+}
 
 function userDir() {
   return app.getPath('userData')
@@ -49,14 +69,19 @@ function writeState(state) {
   fs.writeFileSync(statePath(), JSON.stringify(state, null, 2))
 }
 
+const logBuffer = []
+let lastStatus = '正在准备...'
+
 function log(message) {
   console.log('[dsh-desktop]', message)
+  logBuffer.push(message)
   if (setupWin && !setupWin.isDestroyed()) {
     setupWin.webContents.send('setup-log', message)
   }
 }
 
 function setStatus(status) {
+  lastStatus = status
   if (setupWin && !setupWin.isDestroyed()) {
     setupWin.webContents.send('setup-status', status)
   }
@@ -284,6 +309,10 @@ async function ensureDsh(nodeDir) {
     await npmInstallDsh(nodeDir, version)
     return
   }
+  if (!readSettings().autoUpdateDsh) {
+    log(`已安装 DeepSeek Harness ${installed}（已关闭启动时自动更新）`)
+    return
+  }
   log(`已安装 DeepSeek Harness ${installed}，检查更新...`)
   setStatus('检查版本更新...')
   try {
@@ -369,6 +398,7 @@ function createSetupWindow() {
     width: 720,
     height: 520,
     resizable: false,
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -376,6 +406,10 @@ function createSetupWindow() {
     },
   })
   setupWin.setMenuBarVisibility(false)
+  setupWin.webContents.on('did-finish-load', () => {
+    setupWin.webContents.send('setup-status', lastStatus)
+    for (const line of logBuffer) setupWin.webContents.send('setup-log', line)
+  })
   setupWin.loadFile(path.join(__dirname, 'setup.html'))
 }
 
@@ -383,67 +417,137 @@ function createMainWindow() {
   mainWin = new BrowserWindow({
     width: 1280,
     height: 840,
+    icon: path.join(__dirname, 'icon.png'),
+    autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
     },
   })
+  mainWin.setMenuBarVisibility(false)
   mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
   mainWin.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
+  })
+  mainWin.on('close', (e) => {
+    if (!quitting && readSettings().closeToTray && tray) {
+      e.preventDefault()
+      mainWin.hide()
+    }
   })
   mainWin.on('closed', () => {
     mainWin = null
   })
 }
 
-function buildMenu(nodeDir) {
-  const template = [
-    ...(isMac ? [{ role: 'appMenu' }] : []),
-    { role: 'editMenu', label: '编辑' },
-    { role: 'viewMenu', label: '视图' },
-    { role: 'windowMenu', label: '窗口' },
-    {
-      label: '帮助',
-      submenu: [
-        {
-          label: '检查 dsh 更新',
-          click: async () => {
-            try {
-              const latest = await latestDshVersion()
-              const installed = readState().dshVersion
-              if (latest === installed) {
-                dialog.showMessageBox({ message: `已是最新版本（${installed}）` })
-                return
-              }
-              const { response } = await dialog.showMessageBox({
-                message: `发现新版本 ${latest}（当前 ${installed}），是否立即更新？更新后将重启服务。`,
-                buttons: ['更新', '取消'],
-              })
-              if (response === 0) {
-                await npmInstallDsh(nodeDir, latest)
-                stopServer()
-                await startServer(nodeDir)
-                if (mainWin) mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
-              }
-            } catch (e) {
-              dialog.showErrorBox('检查更新失败', e.message)
-            }
-          },
-        },
-        {
-          label: '在浏览器中打开',
-          click: () => shell.openExternal(`http://127.0.0.1:${serverPort}/`),
-        },
-        {
-          label: '项目主页',
-          click: () => shell.openExternal('https://github.com/deepseek-ai/deepseek-harness'),
-        },
-      ],
+function showMainWindow() {
+  if (mainWin) {
+    mainWin.show()
+    mainWin.focus()
+  } else if (serverPort) {
+    createMainWindow()
+  }
+}
+
+function createSettingsWindow() {
+  if (settingsWin && !settingsWin.isDestroyed()) {
+    settingsWin.show()
+    settingsWin.focus()
+    return
+  }
+  settingsWin = new BrowserWindow({
+    width: 560,
+    height: 620,
+    resizable: false,
+    icon: path.join(__dirname, 'icon.png'),
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
     },
-  ]
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+  })
+  settingsWin.setMenuBarVisibility(false)
+  settingsWin.loadFile(path.join(__dirname, 'settings.html'))
+  settingsWin.on('closed', () => {
+    settingsWin = null
+  })
+}
+
+function sendUpdateEvent(payload) {
+  for (const win of [settingsWin, setupWin]) {
+    if (win && !win.isDestroyed()) win.webContents.send('update-event', payload)
+  }
+}
+
+/** Manually triggered background update of the dsh package; restarts the embedded server when a new version lands. */
+async function manualDshUpdate() {
+  if (updating) return { status: 'busy' }
+  updating = true
+  try {
+    sendUpdateEvent({ phase: 'checking' })
+    const installed = readState().dshVersion || null
+    const latest = await latestDshVersion()
+    if (latest === installed) {
+      sendUpdateEvent({ phase: 'latest', version: installed })
+      return { status: 'latest', version: installed }
+    }
+    sendUpdateEvent({ phase: 'installing', version: latest })
+    await npmInstallDsh(activeNodeDir, latest)
+    sendUpdateEvent({ phase: 'restarting', version: latest })
+    stopServer()
+    await startServer(activeNodeDir)
+    if (mainWin) mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
+    sendUpdateEvent({ phase: 'done', version: latest })
+    return { status: 'updated', version: latest }
+  } catch (e) {
+    sendUpdateEvent({ phase: 'error', message: e.message })
+    return { status: 'error', message: e.message }
+  } finally {
+    updating = false
+  }
+}
+
+function createTray() {
+  const image = nativeImage.createFromPath(path.join(__dirname, 'tray.png'))
+  tray = new Tray(image)
+  tray.setToolTip('DSH Desktop')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: '显示主窗口', click: showMainWindow },
+      { label: '设置', click: createSettingsWindow },
+      { label: '检查 dsh 更新', click: () => manualDshUpdate() },
+      { label: '在浏览器中打开', click: () => shell.openExternal(`http://127.0.0.1:${serverPort}/`) },
+      { type: 'separator' },
+      {
+        label: '退出',
+        click: () => {
+          quitting = true
+          app.quit()
+        },
+      },
+    ]),
+  )
+  tray.on('click', showMainWindow)
+}
+
+function applyLoginItem(settings) {
+  if (isWin || isMac) {
+    app.setLoginItemSettings({ openAtLogin: settings.openAtLogin })
+  } else {
+    const autostartDir = path.join(os.homedir(), '.config', 'autostart')
+    const desktopFile = path.join(autostartDir, 'dsh-desktop.desktop')
+    if (settings.openAtLogin) {
+      fs.mkdirSync(autostartDir, { recursive: true })
+      fs.writeFileSync(
+        desktopFile,
+        `[Desktop Entry]\nType=Application\nName=DSH Desktop\nExec=${JSON.stringify(process.execPath)}\nX-GNOME-Autostart-enabled=true\n`,
+      )
+    } else {
+      fs.rmSync(desktopFile, { force: true })
+    }
+  }
 }
 
 async function checkAppUpdate() {
@@ -463,8 +567,11 @@ async function boot() {
     const nodeDir = await ensureNode()
     await ensureDsh(nodeDir)
     await startServer(nodeDir)
-    buildMenu(nodeDir)
+    activeNodeDir = nodeDir
+    Menu.setApplicationMenu(null)
+    createTray()
     createMainWindow()
+    if (process.env.DSH_DESKTOP_SETTINGS === '1') createSettingsWindow()
     if (setupWin && !setupWin.isDestroyed()) setupWin.close()
     setupWin = null
     checkAppUpdate()
@@ -476,6 +583,20 @@ async function boot() {
 }
 
 ipcMain.handle('app-version', () => app.getVersion())
+ipcMain.handle('get-settings', () => ({
+  ...readSettings(),
+  dshVersion: readState().dshVersion || null,
+  appVersion: app.getVersion(),
+  dataDir: userDir(),
+}))
+ipcMain.handle('set-settings', (_e, settings) => {
+  const merged = { ...readSettings(), ...settings }
+  writeSettings(merged)
+  applyLoginItem(merged)
+  return merged
+})
+ipcMain.handle('manual-update', () => manualDshUpdate())
+ipcMain.handle('open-data-dir', () => shell.openPath(userDir()))
 
 app.on('before-quit', () => {
   quitting = true
@@ -483,7 +604,7 @@ app.on('before-quit', () => {
 })
 
 app.on('window-all-closed', () => {
-  app.quit()
+  if (!tray || quitting) app.quit()
 })
 
 app.whenReady().then(boot)

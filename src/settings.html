@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'" />
+  <title>设置 — DSH Desktop</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      padding: 24px 28px;
+    }
+    h1 { font-size: 18px; margin: 0 0 18px; }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid #21262d;
+    }
+    .row .label { font-size: 14px; }
+    .row .desc { font-size: 12px; color: #8b949e; margin-top: 4px; }
+    .switch { position: relative; width: 40px; height: 22px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0; cursor: pointer;
+      background: #30363d; border-radius: 22px; transition: 0.2s;
+    }
+    .slider:before {
+      content: ""; position: absolute; height: 16px; width: 16px;
+      left: 3px; top: 3px; background: #e6edf3; border-radius: 50%; transition: 0.2s;
+    }
+    input:checked + .slider { background: #238636; }
+    input:checked + .slider:before { transform: translateX(18px); }
+    .section { margin-top: 22px; }
+    button {
+      background: #238636; color: #fff; border: none; border-radius: 6px;
+      padding: 8px 16px; font-size: 14px; cursor: pointer;
+    }
+    button.secondary { background: #21262d; border: 1px solid #30363d; }
+    button:disabled { opacity: 0.6; cursor: default; }
+    #updateStatus { font-size: 13px; color: #8b949e; margin-top: 10px; min-height: 18px; }
+    .meta { font-size: 12px; color: #8b949e; margin-top: 20px; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <h1>设置</h1>
+
+  <div class="row">
+    <div>
+      <div class="label">开机自动启动</div>
+      <div class="desc">登录系统后自动启动 DSH Desktop</div>
+    </div>
+    <label class="switch"><input type="checkbox" id="openAtLogin" /><span class="slider"></span></label>
+  </div>
+
+  <div class="row">
+    <div>
+      <div class="label">关闭窗口时最小化到托盘</div>
+      <div class="desc">关闭主窗口后在系统托盘继续运行，服务不中断</div>
+    </div>
+    <label class="switch"><input type="checkbox" id="closeToTray" /><span class="slider"></span></label>
+  </div>
+
+  <div class="row">
+    <div>
+      <div class="label">启动时自动更新 dsh</div>
+      <div class="desc">每次启动自动检查并安装 @deepseek-ai/dsh 新版本</div>
+    </div>
+    <label class="switch"><input type="checkbox" id="autoUpdateDsh" /><span class="slider"></span></label>
+  </div>
+
+  <div class="section">
+    <button id="updateBtn">立即检查并更新 dsh</button>
+    <button id="dataDirBtn" class="secondary">打开数据目录</button>
+    <div id="updateStatus"></div>
+  </div>
+
+  <div class="meta" id="meta"></div>
+
+  <script src="settings.js"></script>
+</body>
+</html>
