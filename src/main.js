@@ -1,6 +1,6 @@
 'use strict'
 
-const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, shell, nativeImage } = require('electron')
+const { app, BrowserWindow, Menu, Notification, Tray, dialog, ipcMain, shell, nativeImage } = require('electron')
 const { spawn, spawnSync } = require('child_process')
 const fs = require('fs')
 const http = require('http')
@@ -71,6 +71,23 @@ function writeState(state) {
 
 const logBuffer = []
 let lastStatus = '正在准备...'
+let lastStep = 0
+let lastProgress = -1
+
+function setStep(step) {
+  lastStep = step
+  lastProgress = -1
+  if (setupWin && !setupWin.isDestroyed()) {
+    setupWin.webContents.send('setup-step', step)
+  }
+}
+
+function setProgress(pct) {
+  lastProgress = pct
+  if (setupWin && !setupWin.isDestroyed()) {
+    setupWin.webContents.send('setup-progress', pct)
+  }
+}
 
 function log(message) {
   console.log('[dsh-desktop]', message)
@@ -131,9 +148,10 @@ function download(url, dest) {
         done += chunk.length
         if (total) {
           const pct = Math.floor((done / total) * 100)
-          if (pct !== lastPct && pct % 5 === 0) {
+          if (pct !== lastPct) {
             lastPct = pct
-            log(`下载中... ${pct}%`)
+            setProgress(pct)
+            if (pct % 10 === 0) log(`下载中... ${pct}%`)
           }
         }
       })
@@ -231,6 +249,7 @@ async function installLocalNode() {
 
 /** Locate a usable Node.js: system install first, then bundled runtime, else download one. */
 async function ensureNode() {
+  setStep(1)
   setStatus('检测运行环境...')
   const system = systemNodeDir()
   if (system) {
@@ -243,6 +262,7 @@ async function ensureNode() {
     return local
   }
   log('未检测到符合要求的 Node.js（需要 22.19+ 或 24+），将自动安装内置运行时')
+  setStep(2)
   setStatus('自动安装 Node.js 运行时...')
   return installLocalNode()
 }
@@ -302,6 +322,7 @@ async function latestDshVersion() {
 
 /** Install dsh on first launch; afterwards upgrade in place when npm has a newer version. */
 async function ensureDsh(nodeDir) {
+  setStep(3)
   const installed = dshEntry() ? readState().dshVersion : null
   if (!installed) {
     setStatus('首次启动：安装 DeepSeek Harness...')
@@ -362,6 +383,7 @@ async function startServer(nodeDir) {
   const entry = dshEntry()
   if (!entry) throw new Error('未找到 dsh，请重启应用重新安装')
   serverPort = await freePort()
+  setStep(4)
   setStatus('启动 dsh web 服务...')
   log(`启动服务：dsh web --port ${serverPort}`)
   serverProc = spawn(nodeBin(nodeDir), [entry, 'web', '--port', String(serverPort)], {
@@ -408,15 +430,20 @@ function createSetupWindow() {
   setupWin.setMenuBarVisibility(false)
   setupWin.webContents.on('did-finish-load', () => {
     setupWin.webContents.send('setup-status', lastStatus)
+    setupWin.webContents.send('setup-step', lastStep)
+    if (lastProgress >= 0) setupWin.webContents.send('setup-progress', lastProgress)
     for (const line of logBuffer) setupWin.webContents.send('setup-log', line)
   })
   setupWin.loadFile(path.join(__dirname, 'setup.html'))
 }
 
 function createMainWindow() {
+  const saved = readState().windowBounds || {}
   mainWin = new BrowserWindow({
-    width: 1280,
-    height: 840,
+    width: saved.width || 1280,
+    height: saved.height || 840,
+    x: saved.x,
+    y: saved.y,
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
@@ -424,16 +451,34 @@ function createMainWindow() {
       nodeIntegration: false,
     },
   })
+  if (saved.maximized) mainWin.maximize()
   mainWin.setMenuBarVisibility(false)
   mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
   mainWin.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
   })
+  const saveBounds = () => {
+    if (!mainWin || mainWin.isDestroyed() || mainWin.isMinimized()) return
+    const state = readState()
+    state.windowBounds = { ...(mainWin.isMaximized() ? state.windowBounds : mainWin.getBounds()), maximized: mainWin.isMaximized() }
+    writeState(state)
+  }
   mainWin.on('close', (e) => {
+    saveBounds()
     if (!quitting && readSettings().closeToTray && tray) {
       e.preventDefault()
       mainWin.hide()
+      const state = readState()
+      if (!state.trayHintShown && Notification.isSupported()) {
+        new Notification({
+          title: 'DSH Desktop 仍在后台运行',
+          body: '服务未中断，可从系统托盘重新打开窗口或彻底退出。',
+          icon: path.join(__dirname, 'icon.png'),
+        }).show()
+        state.trayHintShown = true
+        writeState(state)
+      }
     }
   })
   mainWin.on('closed', () => {
@@ -458,7 +503,7 @@ function createSettingsWindow() {
   }
   settingsWin = new BrowserWindow({
     width: 560,
-    height: 620,
+    height: 660,
     resizable: false,
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,

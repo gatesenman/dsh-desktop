@@ -2,9 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; img-src 'self'" />
   <title>DSH Desktop</title>
   <style>
+    :root { --accent: #4D6BFE; }
     body {
       margin: 0;
       font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -13,15 +14,61 @@
       display: flex;
       flex-direction: column;
       height: 100vh;
+      user-select: none;
     }
     header {
-      padding: 24px 28px 12px;
+      padding: 28px 32px 8px;
+      text-align: center;
     }
-    h1 { margin: 0 0 6px; font-size: 20px; }
-    #status { color: #7ee787; font-size: 14px; }
+    header img { width: 56px; height: 56px; }
+    h1 { margin: 10px 0 4px; font-size: 20px; font-weight: 600; }
+    #status { color: #8b949e; font-size: 13px; min-height: 18px; }
+    .steps {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin: 18px 32px 0;
+    }
+    .step {
+      flex: 1;
+      max-width: 150px;
+      text-align: center;
+      font-size: 12px;
+      color: #8b949e;
+      padding-top: 10px;
+      border-top: 3px solid #21262d;
+      transition: 0.3s;
+    }
+    .step.active { color: var(--accent); border-top-color: var(--accent); font-weight: 600; }
+    .step.done { color: #3fb950; border-top-color: #3fb950; }
+    .bar-wrap {
+      margin: 20px 32px 0;
+      height: 6px;
+      background: #21262d;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    #bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      border-radius: 6px;
+      transition: width 0.2s;
+    }
+    #barText { text-align: center; font-size: 12px; color: #8b949e; margin-top: 6px; min-height: 16px; }
+    .log-area { flex: 1; display: flex; flex-direction: column; margin: 14px 32px 24px; min-height: 0; }
+    #toggleLog {
+      background: none;
+      border: none;
+      color: #8b949e;
+      font-size: 12px;
+      cursor: pointer;
+      align-self: flex-start;
+      padding: 4px 0;
+    }
+    #toggleLog:hover { color: var(--accent); }
     #log {
       flex: 1;
-      margin: 12px 28px 24px;
       background: #010409;
       border: 1px solid #30363d;
       border-radius: 8px;
@@ -31,26 +78,30 @@
       font-size: 12px;
       white-space: pre-wrap;
       word-break: break-all;
+      display: none;
+      user-select: text;
     }
-    .spinner {
-      display: inline-block;
-      width: 12px; height: 12px;
-      border: 2px solid #30363d;
-      border-top-color: #7ee787;
-      border-radius: 50%;
-      animation: spin 0.9s linear infinite;
-      margin-right: 8px;
-      vertical-align: -2px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    #log.open { display: block; }
   </style>
 </head>
 <body>
   <header>
+    <img src="icon.png" alt="" />
     <h1>DeepSeek Harness 桌面版</h1>
-    <div><span class="spinner"></span><span id="status">正在准备...</span></div>
+    <div id="status">正在准备...</div>
   </header>
-  <div id="log"></div>
+  <div class="steps">
+    <div class="step" id="step1">检测环境</div>
+    <div class="step" id="step2">下载 Node.js</div>
+    <div class="step" id="step3">安装 dsh</div>
+    <div class="step" id="step4">启动服务</div>
+  </div>
+  <div class="bar-wrap"><div id="bar"></div></div>
+  <div id="barText"></div>
+  <div class="log-area">
+    <button id="toggleLog">查看详情 ▾</button>
+    <div id="log"></div>
+  </div>
   <script src="setup.js"></script>
 </body>
 </html>
