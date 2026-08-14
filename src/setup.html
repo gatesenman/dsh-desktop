@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'" />
+  <title>DSH Desktop</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      padding: 24px 28px 12px;
+    }
+    h1 { margin: 0 0 6px; font-size: 20px; }
+    #status { color: #7ee787; font-size: 14px; }
+    #log {
+      flex: 1;
+      margin: 12px 28px 24px;
+      background: #010409;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px;
+      overflow-y: auto;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .spinner {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid #30363d;
+      border-top-color: #7ee787;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+      margin-right: 8px;
+      vertical-align: -2px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DeepSeek Harness 桌面版</h1>
+    <div><span class="spinner"></span><span id="status">正在准备...</span></div>
+  </header>
+  <div id="log"></div>
+  <script>
+    const logEl = document.getElementById('log')
+    const statusEl = document.getElementById('status')
+    window.dshDesktop.onStatus((msg) => { statusEl.textContent = msg })
+    window.dshDesktop.onLog((msg) => {
+      logEl.textContent += msg + '\n'
+      logEl.scrollTop = logEl.scrollHeight
+    })
+  </script>
+</body>
+</html>

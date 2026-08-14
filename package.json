@@ -1,0 +1,64 @@
+{
+  "name": "dsh-desktop",
+  "version": "1.0.0",
+  "description": "Desktop app for DeepSeek Harness (dsh) — auto-installs and embeds the dsh Web UI",
+  "main": "src/main.js",
+  "author": "gatesenman <gaosichun@hotmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gatesenman/dsh-desktop.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:linux": "electron-builder --linux",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^43.3.0",
+    "electron-builder": "^26.14.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.0"
+  },
+  "build": {
+    "appId": "com.gatesenman.dsh-desktop",
+    "productName": "DSH Desktop",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gatesenman",
+        "repo": "dsh-desktop"
+      }
+    ],
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] },
+        { "target": "zip", "arch": ["x64", "arm64"] }
+      ],
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb", "arch": ["x64"] }
+      ],
+      "category": "Development"
+    }
+  }
+}
