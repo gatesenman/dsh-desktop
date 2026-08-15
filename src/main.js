@@ -648,12 +648,34 @@ function themeBackground() {
   return nativeTheme.shouldUseDarkColors ? '#1a1b1e' : '#f7f7f8'
 }
 
-/** Title bar overlay colors matching the current system light/dark theme. */
+/** Dark/light state reported by the embedded Web UI; null = follow the system theme. */
+let pageIsDark = null
+
+/** Title bar overlay colors matching the embedded page theme (fallback: system theme). */
 function overlayColors() {
-  return nativeTheme.shouldUseDarkColors
+  const dark = pageIsDark === null ? nativeTheme.shouldUseDarkColors : pageIsDark
+  return dark
     ? { color: '#1a1b1e', symbolColor: '#c9cdd3', height: 34 }
     : { color: '#f7f7f8', symbolColor: '#555555', height: 34 }
 }
+
+/** Injected observer that reports the page's effective light/dark theme via console messages. */
+const THEME_PROBE = `(() => {
+  if (window.__dshDesktopThemeProbe) return
+  window.__dshDesktopThemeProbe = true
+  const report = () => {
+    let bg = document.body ? getComputedStyle(document.body).backgroundColor : ''
+    if (!bg || bg === 'transparent' || bg === 'rgba(0, 0, 0, 0)') bg = getComputedStyle(document.documentElement).backgroundColor
+    const m = (bg.match(/\\d+(\\.\\d+)?/g) || []).map(Number)
+    if (m.length < 3 || (m.length >= 4 && m[3] === 0)) { console.log('__dsh-desktop-theme:system'); return }
+    const dark = 0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2] < 128
+    console.log('__dsh-desktop-theme:' + (dark ? 'dark' : 'light'))
+  }
+  const mo = new MutationObserver(report)
+  mo.observe(document.documentElement, { attributes: true })
+  if (document.body) mo.observe(document.body, { attributes: true })
+  report()
+})()`
 
 function createMainWindow({ splash = false } = {}) {
   const saved = readState().windowBounds || {}
@@ -674,13 +696,22 @@ function createMainWindow({ splash = false } = {}) {
   })
   if (saved.maximized) mainWin.maximize()
   mainWin.setMenuBarVisibility(false)
-  if (!isMac) {
-    const applyOverlay = () => {
-      if (mainWin && !mainWin.isDestroyed()) mainWin.setTitleBarOverlay(overlayColors())
-    }
-    nativeTheme.on('updated', applyOverlay)
-    mainWin.on('closed', () => nativeTheme.removeListener('updated', applyOverlay))
+  const applyTheme = () => {
+    if (!mainWin || mainWin.isDestroyed()) return
+    const colors = overlayColors()
+    if (!isMac) mainWin.setTitleBarOverlay(colors)
+    mainWin.setBackgroundColor(colors.color)
   }
+  nativeTheme.on('updated', applyTheme)
+  mainWin.on('closed', () => nativeTheme.removeListener('updated', applyTheme))
+  mainWin.webContents.on('console-message', (e) => {
+    const msg = e.message
+    if (msg === '__dsh-desktop-theme:dark') pageIsDark = true
+    else if (msg === '__dsh-desktop-theme:light') pageIsDark = false
+    else if (msg === '__dsh-desktop-theme:system') pageIsDark = null
+    else return
+    applyTheme()
+  })
   mainWin.webContents.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown' || !(isMac ? input.meta : input.control)) return
     const wc = mainWin.webContents
@@ -713,6 +744,7 @@ function createMainWindow({ splash = false } = {}) {
     mainWin.webContents.insertCSS(
       'body::before{content:"";position:fixed;top:0;left:0;right:140px;height:10px;z-index:2147483647;-webkit-app-region:drag;}',
     )
+    mainWin.webContents.executeJavaScript(THEME_PROBE).catch(() => {})
   })
   if (splash) mainWin.loadFile(path.join(__dirname, 'splash.html'))
   else mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
@@ -742,6 +774,7 @@ function createMainWindow({ splash = false } = {}) {
   })
   mainWin.on('closed', () => {
     mainWin = null
+    pageIsDark = null
   })
 }
 
