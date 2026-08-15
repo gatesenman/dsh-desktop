@@ -1,11 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2B6CEA"/>
-      <stop offset="1" stop-color="#153FA8"/>
+      <stop offset="0" stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DBEAFE"/>
     </linearGradient>
   </defs>
   <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
-  <path d="M150 176 L242 256 L150 336" fill="none" stroke="#FFFFFF" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="268" y="314" width="110" height="44" rx="22" fill="#FFFFFF"/>
+  <!-- spout -->
+  <path d="M208 128 C204 100 186 86 166 84 C186 74 214 82 224 106 C234 82 262 74 282 84 C262 86 244 100 240 128 Z" fill="#E0F2FE" opacity="0.95"/>
+  <!-- whale body -->
+  <path d="M96 292
+           C96 214 158 158 234 158
+           C312 158 366 214 372 278
+           C388 264 410 254 434 258
+           C424 274 420 292 424 310
+           C420 328 424 346 434 362
+           C410 366 388 356 372 342
+           C356 386 306 414 240 414
+           C156 414 96 362 96 292 Z" fill="url(#body)"/>
+  <!-- belly lines -->
+  <path d="M132 340 C180 372 260 378 320 356" fill="none" stroke="#93C5FD" stroke-width="14" stroke-linecap="round"/>
+  <path d="M144 372 C190 396 252 400 302 386" fill="none" stroke="#93C5FD" stroke-width="12" stroke-linecap="round" opacity="0.8"/>
+  <!-- eye -->
+  <circle cx="196" cy="252" r="20" fill="#0F172A"/>
+  <circle cx="203" cy="245" r="7" fill="#FFFFFF"/>
+  <!-- smile -->
+  <path d="M236 288 C252 300 274 300 290 288" fill="none" stroke="#0F172A" stroke-width="12" stroke-linecap="round"/>
+  <!-- cheek -->
+  <circle cx="152" cy="292" r="14" fill="#FCA5A5" opacity="0.85"/>
 </svg>

@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Unofficial desktop app for DeepSeek Harness (dsh) — auto-installs and embeds the dsh Web UI",
   "main": "src/main.js",
   "author": "gatesenman <gaosichun@hotmail.com>",
@@ -26,6 +26,10 @@
   "build": {
     "appId": "com.gatesenman.dsh-desktop",
     "productName": "DSH Desktop",
+    "beforePack": "build/prepare-node-runtime.js",
+    "extraResources": [
+      { "from": "node-runtime/${os}-${arch}", "to": "node-runtime" }
+    ],
     "files": [
       "src/**/*",
       "package.json"

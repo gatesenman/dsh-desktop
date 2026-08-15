@@ -1,6 +1,6 @@
 'use strict'
 
-const { app, BrowserWindow, Menu, Notification, Tray, dialog, ipcMain, shell, nativeImage, nativeTheme } = require('electron')
+const { app, BrowserWindow, Menu, Notification, Tray, dialog, ipcMain, shell, nativeImage, nativeTheme, powerMonitor } = require('electron')
 const { spawn, spawnSync } = require('child_process')
 const fs = require('fs')
 const http = require('http')
@@ -236,6 +236,14 @@ function systemNodeDir() {
   return null
 }
 
+/** Node.js runtime shipped inside the installer (resources/node-runtime). */
+function bundledNodeDir() {
+  if (!app.isPackaged) return null
+  const base = path.join(process.resourcesPath, 'node-runtime')
+  const dir = isWin ? base : path.join(base, 'bin')
+  return fs.existsSync(path.join(dir, isWin ? 'node.exe' : 'node')) ? dir : null
+}
+
 function localNodeDir() {
   const marker = path.join(runtimeDir(), 'node-dir.txt')
   try {
@@ -279,7 +287,7 @@ async function installLocalNode() {
   return dir
 }
 
-/** Locate a usable Node.js: system install first, then bundled runtime, else download one. */
+/** Locate a usable Node.js: system install, then installer-bundled runtime, then previously downloaded one, else download. */
 async function ensureNode() {
   setStep(1)
   setStatus('检测运行环境...')
@@ -288,9 +296,14 @@ async function ensureNode() {
     log(`检测到系统 Node.js：${system}`)
     return system
   }
+  const bundled = bundledNodeDir()
+  if (bundled) {
+    log(`使用安装包内置 Node.js 运行时：${bundled}`)
+    return bundled
+  }
   const local = localNodeDir()
   if (local) {
-    log(`使用内置 Node.js 运行时：${local}`)
+    log(`使用本地 Node.js 运行时：${local}`)
     return local
   }
   log('未检测到符合要求的 Node.js（需要 22.19+ 或 24+），将自动安装内置运行时')
@@ -491,6 +504,7 @@ function createSetupWindow() {
     width: 720,
     height: 520,
     resizable: false,
+    backgroundColor: '#0b1020',
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -509,6 +523,11 @@ function createSetupWindow() {
   setupWin.loadFile(path.join(__dirname, 'setup.html'))
 }
 
+/** Window background matching the system theme, so pages don't flash white while loading. */
+function themeBackground() {
+  return nativeTheme.shouldUseDarkColors ? '#1a1b1e' : '#f7f7f8'
+}
+
 /** Title bar overlay colors matching the current system light/dark theme. */
 function overlayColors() {
   return nativeTheme.shouldUseDarkColors
@@ -523,6 +542,7 @@ function createMainWindow({ splash = false } = {}) {
     height: saved.height || 840,
     x: saved.x,
     y: saved.y,
+    backgroundColor: themeBackground(),
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
@@ -544,6 +564,16 @@ function createMainWindow({ splash = false } = {}) {
   mainWin.webContents.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown' || !(isMac ? input.meta : input.control)) return
     const wc = mainWin.webContents
+    if (input.shift && input.key.toLowerCase() === 'r') {
+      e.preventDefault()
+      restartService()
+      return
+    }
+    if (!input.shift && input.key.toLowerCase() === 'u') {
+      e.preventDefault()
+      manualDshUpdate()
+      return
+    }
     let level = null
     if (input.key === '=' || input.key === '+') level = Math.min(wc.getZoomLevel() + 0.5, 5)
     else if (input.key === '-') level = Math.max(wc.getZoomLevel() - 0.5, -5)
@@ -614,6 +644,7 @@ function createSettingsWindow() {
     width: 560,
     height: 660,
     resizable: false,
+    backgroundColor: themeBackground(),
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
@@ -639,6 +670,7 @@ function createLogsWindow() {
   logsWin = new BrowserWindow({
     width: 860,
     height: 620,
+    backgroundColor: themeBackground(),
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
@@ -709,6 +741,38 @@ async function restartService() {
   }
 }
 
+/** Opens a system terminal in the app data dir with the managed Node.js and dsh on PATH. */
+function openTerminal() {
+  const sep = isWin ? ';' : ':'
+  const extra = [activeNodeDir, path.join(prefixDir(), 'bin')].filter(Boolean).join(sep)
+  const env = { ...process.env, PATH: `${extra}${sep}${process.env.PATH || ''}` }
+  const cwd = userDir()
+  try {
+    if (isWin) {
+      spawn('cmd.exe', ['/c', 'start', 'cmd.exe'], { env, cwd, detached: true, stdio: 'ignore' }).unref()
+    } else if (isMac) {
+      const script = path.join(userDir(), 'open-terminal.command')
+      fs.writeFileSync(
+        script,
+        `#!/bin/bash\ncd ${JSON.stringify(cwd)}\nexport PATH=${JSON.stringify(extra)}:"$PATH"\nexec "$SHELL"\n`,
+        { mode: 0o755 },
+      )
+      spawn('open', ['-a', 'Terminal', script], { detached: true, stdio: 'ignore' }).unref()
+    } else {
+      const terminals = ['x-terminal-emulator', 'gnome-terminal', 'konsole', 'xfce4-terminal', 'xterm']
+      const found = terminals.find((t) => spawnSync('which', [t], { encoding: 'utf8' }).status === 0)
+      if (!found) {
+        log('未找到可用的终端程序（尝试过 x-terminal-emulator/gnome-terminal/konsole/xfce4-terminal/xterm）')
+        return
+      }
+      spawn(found, [], { env, cwd, detached: true, stdio: 'ignore' }).unref()
+    }
+    log('已打开终端（node 与 dsh 已加入 PATH）')
+  } catch (e) {
+    log(`打开终端失败：${e.message}`)
+  }
+}
+
 function createTray() {
   const image = nativeImage.createFromPath(path.join(__dirname, 'tray.png'))
   tray = new Tray(image)
@@ -720,6 +784,7 @@ function createTray() {
       { label: '检查 dsh 更新', click: () => manualDshUpdate() },
       { label: '查看控制台日志', click: createLogsWindow },
       { label: '重启服务', click: () => restartService() },
+      { label: '打开终端', click: openTerminal },
       { label: '在浏览器中打开', click: () => shell.openExternal(`http://127.0.0.1:${serverPort}/`) },
       { type: 'separator' },
       {
@@ -753,10 +818,15 @@ function applyLoginItem(settings) {
 }
 
 const APP_UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000
+const UPDATE_STARTUP_DELAY_MS = 30 * 1000
+const UPDATE_STARTUP_JITTER_MS = 2 * 60 * 1000
+const UPDATE_RESUME_MIN_GAP_MS = 60 * 60 * 1000
 let appUpdateTimer = null
+let lastUpdateCheck = 0
 
 async function checkAppUpdate() {
   if (!app.isPackaged) return
+  lastUpdateCheck = Date.now()
   try {
     const { autoUpdater } = require('electron-updater')
     autoUpdater.autoDownload = true
@@ -764,6 +834,16 @@ async function checkAppUpdate() {
   } catch (e) {
     console.warn('app update check failed:', e.message)
   }
+}
+
+/** Schedules update checks: delayed+jittered at startup, periodic, and after system resume. */
+function scheduleUpdateChecks() {
+  if (appUpdateTimer) return
+  setTimeout(checkAppUpdate, UPDATE_STARTUP_DELAY_MS + Math.random() * UPDATE_STARTUP_JITTER_MS)
+  appUpdateTimer = setInterval(checkAppUpdate, APP_UPDATE_INTERVAL_MS)
+  powerMonitor.on('resume', () => {
+    if (Date.now() - lastUpdateCheck > UPDATE_RESUME_MIN_GAP_MS) checkAppUpdate()
+  })
 }
 
 /** Offers retry / view logs / quit when startup fails, looping until resolved. */
@@ -815,8 +895,7 @@ async function boot() {
     if (process.env.DSH_DESKTOP_SETTINGS === '1') createSettingsWindow()
     if (setupWin && !setupWin.isDestroyed()) setupWin.close()
     setupWin = null
-    checkAppUpdate()
-    if (!appUpdateTimer) appUpdateTimer = setInterval(checkAppUpdate, APP_UPDATE_INTERVAL_MS)
+    scheduleUpdateChecks()
   } catch (e) {
     setStatus('启动失败')
     log(`错误：${e.message}`)
