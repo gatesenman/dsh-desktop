@@ -38,7 +38,8 @@
       {
         "provider": "github",
         "owner": "gatesenman",
-        "repo": "dsh-desktop"
+        "repo": "dsh-desktop",
+        "releaseType": "release"
       }
     ],
     "mac": {
