@@ -1,6 +1,6 @@
 'use strict'
 
-const { app, BrowserWindow, Menu, Notification, Tray, dialog, ipcMain, shell, nativeImage, nativeTheme, powerMonitor } = require('electron')
+const { app, BrowserWindow, Menu, Notification, Tray, clipboard, dialog, ipcMain, shell, nativeImage, nativeTheme, powerMonitor } = require('electron')
 const { spawn, spawnSync } = require('child_process')
 const fs = require('fs')
 const http = require('http')
@@ -51,6 +51,19 @@ function runtimeDir() {
 
 function prefixDir() {
   return path.join(userDir(), 'dsh')
+}
+
+function versionsDir() {
+  return path.join(userDir(), 'dsh-versions')
+}
+
+function versionInstallDir(version) {
+  return path.join(versionsDir(), version)
+}
+
+/** DeepSeek Harness home directory holding profiles, settings, and credentials. */
+function dshHome() {
+  return process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
 }
 
 function statePath() {
@@ -337,27 +350,120 @@ function nodeBin(nodeDir) {
   return path.join(nodeDir, isWin ? 'node.exe' : 'node')
 }
 
-function dshEntry() {
+function dshEntryIn(prefix) {
   const candidates = [
-    path.join(prefixDir(), 'lib', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
-    path.join(prefixDir(), 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
+    path.join(prefix, 'lib', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
+    path.join(prefix, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
   ]
   return candidates.find((p) => fs.existsSync(p)) || null
 }
 
+/** npm prefix holding the active dsh install: the pinned version dir, else the legacy shared prefix. */
+function activeDshPrefix() {
+  const version = readState().dshVersion
+  if (version && dshEntryIn(versionInstallDir(version))) return versionInstallDir(version)
+  return prefixDir()
+}
+
+function dshEntry() {
+  return dshEntryIn(activeDshPrefix())
+}
+
+/** The previously installed dsh version, kept on disk for one-click rollback. */
+function rollbackCandidate() {
+  const prev = readState().dshPreviousVersion
+  if (prev && prev !== readState().dshVersion && dshEntryIn(versionInstallDir(prev))) return prev
+  return null
+}
+
+/** Removes stale versioned installs, keeping only the active and rollback versions. */
+function pruneDshVersions() {
+  const state = readState()
+  const keep = new Set([state.dshVersion, state.dshPreviousVersion].filter(Boolean))
+  let entries = []
+  try {
+    entries = fs.readdirSync(versionsDir())
+  } catch {
+    // versions dir absent — nothing to prune
+  }
+  for (const name of entries) {
+    if (!keep.has(name)) fs.rmSync(versionInstallDir(name), { recursive: true, force: true })
+  }
+}
+
+/** Installs one dsh version into its own prefix, prechecks it, then promotes it to active with rollback kept. */
 async function npmInstallDsh(nodeDir, version) {
   setStatus(`安装 DeepSeek Harness (${version})...`)
   log(`npm install ${DSH_PACKAGE}@${version}`)
-  fs.mkdirSync(prefixDir(), { recursive: true })
+  const prefix = versionInstallDir(version)
+  fs.mkdirSync(prefix, { recursive: true })
   await run(
     nodeBin(nodeDir),
-    [npmCli(nodeDir), 'install', '-g', `${DSH_PACKAGE}@${version}`, `--prefix=${prefixDir()}`, '--no-fund', '--no-audit'],
+    [npmCli(nodeDir), 'install', '-g', `${DSH_PACKAGE}@${version}`, `--prefix=${prefix}`, '--no-fund', '--no-audit'],
     { env: envWithNode(nodeDir) },
   )
+  const entry = dshEntryIn(prefix)
+  if (!entry) {
+    fs.rmSync(prefix, { recursive: true, force: true })
+    throw new Error(`安装后未找到 dsh 入口文件（${version}）`)
+  }
+  setStatus(`校验 DeepSeek Harness (${version})...`)
+  try {
+    await run(nodeBin(nodeDir), [entry, '--version'], { env: envWithNode(nodeDir) })
+  } catch (e) {
+    fs.rmSync(prefix, { recursive: true, force: true })
+    throw e
+  }
   const state = readState()
+  if (state.dshVersion && state.dshVersion !== version) {
+    migrateLegacyInstall(state.dshVersion)
+    state.dshPreviousVersion = state.dshVersion
+  }
   state.dshVersion = version
   writeState(state)
-  log(`DeepSeek Harness ${version} 安装完成`)
+  pruneDshVersions()
+  log(`DeepSeek Harness ${version} 安装并校验完成`)
+}
+
+/** Moves a dsh install living in the legacy shared prefix into its versioned directory so it stays rollback-able. */
+function migrateLegacyInstall(version) {
+  if (dshEntryIn(versionInstallDir(version))) return
+  if (!dshEntryIn(prefixDir())) return
+  try {
+    fs.mkdirSync(versionsDir(), { recursive: true })
+    fs.renameSync(prefixDir(), versionInstallDir(version))
+    log(`已迁移 dsh ${version} 到版本目录`)
+  } catch (e) {
+    log(`迁移旧版 dsh 失败（跳过）：${e.message}`)
+  }
+}
+
+/** Rolls the active dsh back to the previous kept version and restarts the service. */
+async function rollbackDsh() {
+  const prev = rollbackCandidate()
+  if (!prev) return { status: 'none' }
+  if (updating || restarting) return { status: 'busy' }
+  const state = readState()
+  const from = state.dshVersion
+  log(`回滚 dsh：${from} → ${prev}`)
+  state.dshPreviousVersion = from
+  state.dshVersion = prev
+  writeState(state)
+  const result = await restartService()
+  if (result.status === 'restarted') {
+    updateTray()
+    if (Notification.isSupported()) {
+      new Notification({ title: 'dsh 已回滚', body: `当前版本：${prev}（原 ${from}）`, icon: path.join(__dirname, 'icon.png') }).show()
+    }
+  } else if (result.status === 'error') {
+    const revert = readState()
+    revert.dshVersion = from
+    revert.dshPreviousVersion = prev
+    writeState(revert)
+    log(`回滚后服务启动失败，已还原到 ${from}`)
+    await restartService()
+  }
+  return result
 }
 
 async function latestDshVersion() {
@@ -437,7 +543,9 @@ async function startServer(nodeDir) {
   log(`启动服务：dsh web --port ${serverPort}`)
   serverProc = spawn(nodeBin(nodeDir), [entry, 'web', '--port', String(serverPort)], {
     env: envWithNode(nodeDir),
+    cwd: workspaceDir() || undefined,
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: !isWin,
   })
   serverProc.stdout.on('data', (b) => log(b.toString().trim()))
   serverProc.stderr.on('data', (b) => log(b.toString().trim()))
@@ -477,8 +585,20 @@ function stopServer() {
     proc.expectedExit = true
     serverProc = null
     try {
-      if (isWin) spawnSync('taskkill', ['/pid', String(proc.pid), '/t', '/f'])
-      else proc.kill('SIGTERM')
+      if (isWin) {
+        spawnSync('taskkill', ['/pid', String(proc.pid), '/t', '/f'])
+      } else if (quitting) {
+        process.kill(-proc.pid, 'SIGKILL')
+      } else {
+        process.kill(-proc.pid, 'SIGTERM')
+        setTimeout(() => {
+          try {
+            process.kill(-proc.pid, 'SIGKILL')
+          } catch {
+            // process group already gone
+          }
+        }, 4000)
+      }
     } catch {
       // process already gone
     }
@@ -709,10 +829,24 @@ async function manualDshUpdate() {
     await npmInstallDsh(activeNodeDir, latest)
     sendUpdateEvent({ phase: 'restarting', version: latest })
     stopServer()
-    await startServer(activeNodeDir)
+    try {
+      await startServer(activeNodeDir)
+    } catch (e) {
+      if (installed && rollbackCandidate() === installed) {
+        log(`新版本 ${latest} 启动失败，自动回退到 ${installed}`)
+        const state = readState()
+        state.dshVersion = installed
+        state.dshPreviousVersion = latest
+        writeState(state)
+        await startServer(activeNodeDir)
+      } else {
+        throw e
+      }
+    }
     if (mainWin) mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
-    sendUpdateEvent({ phase: 'done', version: latest })
-    return { status: 'updated', version: latest }
+    sendUpdateEvent({ phase: 'done', version: readState().dshVersion })
+    updateTray()
+    return { status: 'updated', version: readState().dshVersion }
   } catch (e) {
     sendUpdateEvent({ phase: 'error', message: e.message })
     return { status: 'error', message: e.message }
@@ -744,7 +878,7 @@ async function restartService() {
 /** Opens a system terminal in the app data dir with the managed Node.js and dsh on PATH. */
 function openTerminal() {
   const sep = isWin ? ';' : ':'
-  const extra = [activeNodeDir, path.join(prefixDir(), 'bin')].filter(Boolean).join(sep)
+  const extra = [activeNodeDir, path.join(activeDshPrefix(), 'bin')].filter(Boolean).join(sep)
   const env = { ...process.env, PATH: `${extra}${sep}${process.env.PATH || ''}` }
   const cwd = userDir()
   try {
@@ -773,29 +907,287 @@ function openTerminal() {
   }
 }
 
+/** Backs up the DSH home (sessions, settings, credentials) and desktop preferences into one archive. */
+async function backupData() {
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: '备份 DSH 数据',
+    defaultPath: path.join(app.getPath('downloads'), `dsh-backup-${new Date().toISOString().slice(0, 10)}.tar.gz`),
+    filters: [{ name: 'DSH 备份', extensions: ['tar.gz', 'tgz'] }],
+  })
+  if (canceled || !filePath) return { status: 'canceled' }
+  const staging = path.join(userDir(), 'backup-staging')
+  try {
+    fs.rmSync(staging, { recursive: true, force: true })
+    fs.mkdirSync(staging, { recursive: true })
+    try {
+      fs.copyFileSync(statePath(), path.join(staging, 'dsh-desktop-state.json'))
+    } catch {
+      // no desktop state yet — back up the DSH home alone
+    }
+    const home = dshHome()
+    const args = ['-czf', filePath]
+    if (fs.existsSync(home)) {
+      args.push('--exclude', 'node_modules', '-C', path.dirname(home), path.basename(home))
+    }
+    args.push('-C', staging, '.')
+    await run('tar', args)
+    log(`备份完成：${filePath}`)
+    if (Notification.isSupported()) {
+      new Notification({
+        title: '备份完成',
+        body: `${filePath}\n备份包含 API 凭据，请妥善保管`,
+        icon: path.join(__dirname, 'icon.png'),
+      }).show()
+    }
+    return { status: 'saved', filePath }
+  } catch (e) {
+    log(`备份失败：${e.message}`)
+    dialog.showErrorBox('备份失败', e.message)
+    return { status: 'error', message: e.message }
+  } finally {
+    fs.rmSync(staging, { recursive: true, force: true })
+  }
+}
+
+/** Rejects archives whose member paths could escape the extraction directory. */
+async function assertSafeArchive(archive) {
+  const listing = spawnSync('tar', ['-tzf', archive], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  if (listing.status !== 0) throw new Error('无法读取备份文件（不是有效的 tar.gz 归档）')
+  for (const entry of listing.stdout.split('\n')) {
+    if (!entry) continue
+    if (path.isAbsolute(entry) || entry.split('/').includes('..')) {
+      throw new Error(`备份文件包含不安全的路径：${entry}`)
+    }
+  }
+}
+
+/** Preference keys restored from a backup; runtime install records stay owned by this machine. */
+const RESTORED_STATE_KEYS = ['settings', 'windowBounds', 'zoomLevel', 'workspaceDir', 'recentWorkspaces']
+
+/** Restores a backup archive into the DSH home after confirmation, then restarts the service. */
+async function restoreData() {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: '选择备份文件',
+    filters: [{ name: 'DSH 备份', extensions: ['gz', 'tgz'] }],
+    properties: ['openFile'],
+  })
+  if (canceled || !filePaths[0]) return { status: 'canceled' }
+  const archive = filePaths[0]
+  const { response } = await dialog.showMessageBox({
+    type: 'warning',
+    title: '恢复备份',
+    message: '恢复将覆盖当前的会话、设置与凭据，并重启服务。确定继续？',
+    buttons: ['恢复', '取消'],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+  })
+  if (response !== 0) return { status: 'canceled' }
+  const staging = path.join(userDir(), 'restore-staging')
+  let serverStopped = false
+  try {
+    await assertSafeArchive(archive)
+    fs.rmSync(staging, { recursive: true, force: true })
+    fs.mkdirSync(staging, { recursive: true })
+    await run('tar', ['-xzf', archive, '-C', staging])
+    const home = dshHome()
+    const restoredHome = path.join(staging, path.basename(home))
+    if (!fs.existsSync(restoredHome)) throw new Error('备份文件中未找到 DSH 数据目录')
+    stopServer()
+    serverStopped = true
+    fs.cpSync(restoredHome, home, { recursive: true, force: true })
+    const restoredState = path.join(staging, 'dsh-desktop-state.json')
+    if (fs.existsSync(restoredState)) {
+      const incoming = JSON.parse(fs.readFileSync(restoredState, 'utf8'))
+      const state = readState()
+      for (const key of RESTORED_STATE_KEYS) {
+        if (incoming[key] !== undefined) state[key] = incoming[key]
+      }
+      writeState(state)
+    }
+    fs.rmSync(staging, { recursive: true, force: true })
+    log(`已从备份恢复：${archive}`)
+    updateTray()
+    return restartService()
+  } catch (e) {
+    fs.rmSync(staging, { recursive: true, force: true })
+    log(`恢复失败：${e.message}`)
+    dialog.showErrorBox('恢复失败', e.message)
+    if (serverStopped) await restartService()
+    return { status: 'error', message: e.message }
+  }
+}
+
+function probeUrl(url, timeoutMs = 6000) {
+  return new Promise((resolve) => {
+    const req = https.get(url, { headers: { 'user-agent': 'dsh-desktop' }, timeout: timeoutMs }, (res) => {
+      res.resume()
+      resolve(`可达（HTTP ${res.statusCode}）`)
+    })
+    req.on('timeout', () => req.destroy(new Error('timeout')))
+    req.on('error', (e) => resolve(`不可达（${e.message}）`))
+  })
+}
+
+function probeLocalServer(port, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    if (!port) return resolve('未启动')
+    const req = http.get({ host: '127.0.0.1', port, path: '/', timeout: timeoutMs }, (res) => {
+      res.resume()
+      resolve(`运行中（端口 ${port}，HTTP ${res.statusCode}）`)
+    })
+    req.on('timeout', () => req.destroy(new Error('timeout')))
+    req.on('error', (e) => resolve(`异常（端口 ${port}，${e.message}）`))
+  })
+}
+
+/** Collects a structured environment diagnosis and offers to copy the full report. */
+async function runDoctor() {
+  const lines = []
+  const state = readState()
+  lines.push(`应用：DSH Desktop ${app.getVersion()}（${app.isPackaged ? '安装版' : '开发模式'}）`)
+  lines.push(`系统：${process.platform} ${process.arch} / Electron ${process.versions.electron} / 内置 Node ${process.versions.node}`)
+  const nodeProbe = activeNodeDir ? spawnSync(nodeBin(activeNodeDir), ['--version'], { encoding: 'utf8' }) : null
+  lines.push(`服务 Node：${nodeProbe && nodeProbe.status === 0 ? `${nodeProbe.stdout.trim()}（${activeNodeDir}）` : '未就绪'}`)
+  const entry = dshEntry()
+  lines.push(`dsh：${state.dshVersion || '未安装'}${entry ? '' : '（入口文件缺失！）'}${rollbackCandidate() ? `，可回滚到 ${rollbackCandidate()}` : ''}`)
+  lines.push(`dsh 服务：${await probeLocalServer(serverPort)}`)
+  const home = dshHome()
+  let homeStatus = '不存在'
+  try {
+    fs.accessSync(home, fs.constants.W_OK)
+    homeStatus = '可读写'
+  } catch {
+    homeStatus = fs.existsSync(home) ? '不可写！' : '不存在（首次使用前正常）'
+  }
+  lines.push(`DSH 数据目录：${home}（${homeStatus}）`)
+  lines.push(`工作目录：${workspaceDir() || '默认（应用数据目录）'}`)
+  try {
+    const stat = fs.statfsSync(userDir())
+    lines.push(`磁盘剩余：${Math.round((stat.bavail * stat.bsize) / 1024 / 1024 / 1024)} GB`)
+  } catch {
+    // statfs unsupported on this platform — omit disk space
+  }
+  const proxies = ['HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'NO_PROXY']
+    .map((k) => (process.env[k] || process.env[k.toLowerCase()] ? `${k}=已设置` : null))
+    .filter(Boolean)
+  lines.push(`代理：${proxies.length ? proxies.join('，') : '未设置'}`)
+  const [npmReach, apiReach] = await Promise.all([
+    probeUrl('https://registry.npmjs.org/-/ping'),
+    probeUrl('https://api.deepseek.com/'),
+  ])
+  lines.push(`npm 仓库：${npmReach}`)
+  lines.push(`DeepSeek API：${apiReach}`)
+  const report = lines.join('\n')
+  log('环境体检完成')
+  const { response } = await dialog.showMessageBox({
+    type: 'info',
+    title: '环境体检',
+    message: '环境体检报告',
+    detail: report,
+    buttons: ['复制报告', '关闭'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  })
+  if (response === 0) clipboard.writeText(report)
+  return report
+}
+
+/** The default workspace root passed to the dsh service as its working directory. */
+function workspaceDir() {
+  const dir = readState().workspaceDir
+  if (dir && fs.existsSync(dir)) return dir
+  return null
+}
+
+const RECENT_WORKSPACE_LIMIT = 5
+
+/** Sets the default workspace root, records it as recent, and restarts the service there. */
+async function setWorkspace(dir) {
+  const previous = readState().workspaceDir
+  const state = readState()
+  state.workspaceDir = dir || undefined
+  if (dir) {
+    state.recentWorkspaces = [dir, ...(state.recentWorkspaces || []).filter((d) => d !== dir)].slice(0, RECENT_WORKSPACE_LIMIT)
+  }
+  writeState(state)
+  updateTray()
+  log(dir ? `切换默认工作目录：${dir}` : '恢复默认工作目录')
+  const result = await restartService()
+  if (result.status === 'error') {
+    const revert = readState()
+    revert.workspaceDir = previous
+    writeState(revert)
+    updateTray()
+    log(`切换工作目录后服务启动失败，已还原`)
+    await restartService()
+  }
+  return result
+}
+
+async function pickWorkspace() {
+  const { canceled, filePaths } = await dialog.showOpenDialog({ title: '选择工作目录', properties: ['openDirectory'] })
+  if (canceled || !filePaths[0]) return
+  await setWorkspace(filePaths[0])
+}
+
+function workspaceMenu() {
+  const state = readState()
+  const current = workspaceDir()
+  const items = [{ label: '选择文件夹...', click: pickWorkspace }]
+  const recents = (state.recentWorkspaces || []).filter((d) => fs.existsSync(d))
+  if (recents.length) {
+    items.push({ type: 'separator' })
+    for (const dir of recents) {
+      items.push({
+        label: path.basename(dir) + `  (${dir.length > 40 ? '…' + dir.slice(-38) : dir})`,
+        type: 'radio',
+        checked: dir === current,
+        click: () => setWorkspace(dir),
+      })
+    }
+  }
+  items.push({ type: 'separator' })
+  items.push({ label: '恢复默认（应用数据目录）', type: 'radio', checked: !current, click: () => setWorkspace(null) })
+  return items
+}
+
+function trayMenuTemplate() {
+  const prev = rollbackCandidate()
+  return [
+    { label: '显示主窗口', click: showMainWindow },
+    { label: '工作目录', submenu: workspaceMenu() },
+    { label: '设置', click: createSettingsWindow },
+    { label: '检查 dsh 更新', click: () => manualDshUpdate() },
+    ...(prev ? [{ label: `回滚 dsh 到 ${prev}`, click: () => rollbackDsh() }] : []),
+    { label: '环境体检', click: () => runDoctor() },
+    { label: '备份数据...', click: () => backupData() },
+    { label: '恢复备份...', click: () => restoreData() },
+    { label: '查看控制台日志', click: createLogsWindow },
+    { label: '重启服务', click: () => restartService() },
+    { label: '打开终端', click: openTerminal },
+    { label: '在浏览器中打开', click: () => shell.openExternal(`http://127.0.0.1:${serverPort}/`) },
+    { type: 'separator' },
+    {
+      label: '退出',
+      click: () => {
+        quitting = true
+        app.quit()
+      },
+    },
+  ]
+}
+
+function updateTray() {
+  if (tray) tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate()))
+}
+
 function createTray() {
   const image = nativeImage.createFromPath(path.join(__dirname, 'tray.png'))
   tray = new Tray(image)
   tray.setToolTip('DSH Desktop')
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: '显示主窗口', click: showMainWindow },
-      { label: '设置', click: createSettingsWindow },
-      { label: '检查 dsh 更新', click: () => manualDshUpdate() },
-      { label: '查看控制台日志', click: createLogsWindow },
-      { label: '重启服务', click: () => restartService() },
-      { label: '打开终端', click: openTerminal },
-      { label: '在浏览器中打开', click: () => shell.openExternal(`http://127.0.0.1:${serverPort}/`) },
-      { type: 'separator' },
-      {
-        label: '退出',
-        click: () => {
-          quitting = true
-          app.quit()
-        },
-      },
-    ]),
-  )
+  updateTray()
   tray.on('click', showMainWindow)
 }
 
@@ -910,6 +1302,7 @@ ipcMain.handle('app-version', () => app.getVersion())
 ipcMain.handle('get-settings', () => ({
   ...readSettings(),
   dshVersion: readState().dshVersion || null,
+  dshRollbackVersion: rollbackCandidate(),
   appVersion: app.getVersion(),
   dataDir: userDir(),
 }))
@@ -920,6 +1313,10 @@ ipcMain.handle('set-settings', (_e, settings) => {
   return merged
 })
 ipcMain.handle('manual-update', () => manualDshUpdate())
+ipcMain.handle('run-doctor', () => runDoctor())
+ipcMain.handle('backup-data', () => backupData())
+ipcMain.handle('restore-data', () => restoreData())
+ipcMain.handle('rollback-dsh', () => rollbackDsh())
 ipcMain.handle('open-data-dir', () => shell.openPath(userDir()))
 ipcMain.handle('open-logs', () => createLogsWindow())
 ipcMain.handle('restart-service', () => restartService())

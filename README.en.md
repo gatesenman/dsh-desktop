@@ -26,7 +26,7 @@ Embedded Web UI, frameless immersive window:
 
 ![Main window](assets/main-window.png)
 
-Settings (auto-start, tray, updates, restart service, logs):
+Settings (auto-start, tray, updates, restart service, logs, plus maintenance: environment doctor, backup/restore, dsh rollback):
 
 ![Settings](assets/settings.png)
 
@@ -42,12 +42,16 @@ Console logs (live view, copy, export):
 - **Embedded Web UI**: starts the `dsh web` service and embeds it in the app window.
 - **Distraction-free UI**: frameless main window with no title bar, menu bar, or toolbar (native window controls kept); window size, position, maximized state, and zoom level are remembered (Ctrl/Cmd +/- to zoom, 0 to reset); the window background follows the system light/dark theme, so pages never flash white while loading.
 - **Stable and reliable**: single-instance app (launching again focuses the existing window); the `dsh web` service auto-restarts if it exits unexpectedly; startup failures offer one-click retry or log viewing; shortcuts Ctrl/Cmd+Shift+R restart the service and Ctrl/Cmd+U check for dsh updates.
-- **System tray**: closing the window can minimize to tray and keep the service running (a one-time system notification explains this); the tray menu supports show window, settings, check for updates, open a terminal (with node and dsh preconfigured on PATH), open in browser, and quit.
+- **System tray**: closing the window can minimize to tray and keep the service running (a one-time system notification explains this); the tray menu supports show window, switch working directory, settings, check for updates, roll back dsh, environment doctor, backup/restore, open a terminal (with node and dsh preconfigured on PATH), open in browser, and quit.
 - **System settings**: launch at login, minimize to tray on close, and auto-update dsh on startup — all toggleable in the settings window; one click opens the data directory.
 - **Console logs**: open the log window from settings or the tray menu to watch app and dsh service logs live, with one-click copy and export; logs are also written to `dsh-desktop.log` in the data directory.
 - **Restart service**: restart the embedded dsh service with one click from settings or the tray menu, without restarting the app.
 - **Updates**: manual "Check and update dsh" runs the install in the background and restarts the service; when auto-update is on, `@deepseek-ai/dsh` is upgraded on every launch; the app itself auto-updates via GitHub Releases (a jittered check shortly after startup, every 6 hours, and again after the system wakes from sleep).
 - **Security hardening**: the service listens only on a random loopback port; the renderer runs with Node integration disabled and context isolation enabled; external links always open in the system browser.
+- **dsh version pinning with one-click rollback**: each dsh version installs into its own directory; upgrades install into a new directory and run a `dsh --version` preflight before switching; the previous version is kept, the app automatically falls back if the service fails to start after an upgrade, and you can roll back anytime from the tray or settings.
+- **One-click backup/restore**: packs the DSH data directory (sessions, settings, credentials) and desktop preferences into a single `tar.gz` archive; restore asks for confirmation, validates archive paths for safety, and restarts the service when done. Backups contain API credentials — keep them safe.
+- **Environment doctor**: generates a diagnostic report in one click (app/system/Node/dsh versions, service and port status, data directory read/write, free disk space, proxy and npm/DeepSeek API network reachability) that you can copy and share for troubleshooting; it contains no API keys or other sensitive values and uploads nothing.
+- **Working directory switching**: the tray "Working directory" submenu lets you pick any folder as the dsh service's working directory (recent folders are remembered), with one click to restore the default.
 
 ## Download
 

@@ -62,9 +62,9 @@
     button:hover { filter: brightness(1.1); }
     button.secondary { background: #21262d; border: 1px solid #30363d; }
     button:disabled { opacity: 0.6; cursor: default; }
-    #updateStatus { font-size: 13px; color: #8b949e; padding-bottom: 12px; min-height: 18px; }
-    #updateStatus.ok { color: #3fb950; }
-    #updateStatus.err { color: #f85149; }
+    #updateStatus, #maintStatus { font-size: 13px; color: #8b949e; padding-bottom: 12px; min-height: 18px; }
+    #updateStatus.ok, #maintStatus.ok { color: #3fb950; }
+    #updateStatus.err, #maintStatus.err { color: #f85149; }
     .bar-wrap { height: 4px; background: #21262d; border-radius: 4px; overflow: hidden; margin-bottom: 12px; display: none; }
     .bar-wrap.show { display: block; }
     #updateBar {
@@ -116,6 +116,17 @@
     </div>
     <div class="bar-wrap" id="updateBarWrap"><div id="updateBar"></div></div>
     <div id="updateStatus"></div>
+  </div>
+
+  <div class="group-title">维护</div>
+  <div class="group">
+    <div class="actions">
+      <button id="doctorBtn" class="secondary">环境体检</button>
+      <button id="backupBtn" class="secondary">备份数据</button>
+      <button id="restoreBtn" class="secondary">恢复备份</button>
+      <button id="rollbackBtn" class="secondary">回滚 dsh</button>
+    </div>
+    <div id="maintStatus"></div>
   </div>
 
   <div class="group-title">关于</div>

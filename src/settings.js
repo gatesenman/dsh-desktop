@@ -7,6 +7,8 @@ async function load() {
   const s = await window.dshDesktop.getSettings()
   for (const k of keys) $(k).checked = !!s[k]
   $('meta').textContent = `dsh 版本：${s.dshVersion || '未安装'}\n应用版本：${s.appVersion}\n数据目录：${s.dataDir}`
+  $('rollbackBtn').disabled = !s.dshRollbackVersion
+  $('rollbackBtn').textContent = s.dshRollbackVersion ? `回滚 dsh 到 ${s.dshRollbackVersion}` : '回滚 dsh（无可用版本）'
 }
 load()
 
@@ -50,6 +52,45 @@ $('updateBtn').addEventListener('click', async () => {
   else if (result.status === 'busy') setUpdateStatus('已有更新任务在进行中')
   else setUpdateStatus(`更新失败：${result.message}`, 'err')
   setBusy(false)
+  load()
+})
+
+function setMaintStatus(text, kind) {
+  const el = $('maintStatus')
+  el.textContent = text
+  el.className = kind || ''
+}
+
+$('doctorBtn').addEventListener('click', () => window.dshDesktop.runDoctor())
+
+$('backupBtn').addEventListener('click', async () => {
+  $('backupBtn').disabled = true
+  setMaintStatus('正在备份...')
+  const result = await window.dshDesktop.backupData()
+  if (result.status === 'saved') setMaintStatus(`备份完成：${result.filePath}`, 'ok')
+  else if (result.status === 'canceled') setMaintStatus('')
+  else setMaintStatus(`备份失败：${result.message}`, 'err')
+  $('backupBtn').disabled = false
+})
+
+$('restoreBtn').addEventListener('click', async () => {
+  $('restoreBtn').disabled = true
+  setMaintStatus('正在恢复...')
+  const result = await window.dshDesktop.restoreData()
+  if (result.status === 'restarted') setMaintStatus('恢复完成，服务已重启', 'ok')
+  else if (result.status === 'canceled') setMaintStatus('')
+  else setMaintStatus(`恢复失败：${result.message || ''}`, 'err')
+  $('restoreBtn').disabled = false
+})
+
+$('rollbackBtn').addEventListener('click', async () => {
+  $('rollbackBtn').disabled = true
+  setMaintStatus('正在回滚 dsh...')
+  const result = await window.dshDesktop.rollbackDsh()
+  if (result.status === 'restarted') setMaintStatus('回滚完成，服务已重启', 'ok')
+  else if (result.status === 'none') setMaintStatus('没有可回滚的版本')
+  else if (result.status === 'busy') setMaintStatus('已有任务在进行中')
+  else setMaintStatus(`回滚失败：${result.message || ''}`, 'err')
   load()
 })
 
