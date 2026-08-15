@@ -71,8 +71,32 @@ function writeState(state) {
 }
 
 const LOG_LIMIT = 5000
+const LOG_FILE_LIMIT = 2 * 1024 * 1024
 const logBuffer = []
+let logStream = null
 let lastStatus = '正在准备...'
+
+function logFilePath() {
+  return path.join(userDir(), 'dsh-desktop.log')
+}
+
+function appendLogFile(line) {
+  try {
+    if (!logStream) {
+      fs.mkdirSync(userDir(), { recursive: true })
+      const file = logFilePath()
+      try {
+        if (fs.statSync(file).size > LOG_FILE_LIMIT) fs.renameSync(file, `${file}.old`)
+      } catch {
+        // log file absent — nothing to rotate
+      }
+      logStream = fs.createWriteStream(file, { flags: 'a' })
+    }
+    logStream.write(line + '\n')
+  } catch {
+    // logging to disk is best-effort
+  }
+}
 let lastStep = 0
 let lastProgress = -1
 
@@ -95,6 +119,7 @@ function log(message) {
   console.log('[dsh-desktop]', message)
   const line = `[${new Date().toLocaleTimeString('en-GB')}] ${message}`
   logBuffer.push(line)
+  appendLogFile(line)
   if (logBuffer.length > LOG_LIMIT) logBuffer.splice(0, logBuffer.length - LOG_LIMIT)
   if (setupWin && !setupWin.isDestroyed()) {
     setupWin.webContents.send('setup-log', message)
@@ -386,6 +411,10 @@ function waitForServer(port, timeoutMs = 120000) {
   })
 }
 
+const CRASH_RESTART_LIMIT = 3
+const STABLE_UPTIME_MS = 60000
+let crashRestarts = 0
+
 async function startServer(nodeDir) {
   const entry = dshEntry()
   if (!entry) throw new Error('未找到 dsh，请重启应用重新安装')
@@ -400,14 +429,33 @@ async function startServer(nodeDir) {
   serverProc.stdout.on('data', (b) => log(b.toString().trim()))
   serverProc.stderr.on('data', (b) => log(b.toString().trim()))
   const proc = serverProc
+  const startedAt = Date.now()
   serverProc.on('exit', (code) => {
     if (serverProc === proc) serverProc = null
     if (!quitting && !proc.expectedExit) {
-      dialog.showErrorBox('dsh web 服务已退出', `退出码：${code}。请重启应用。`)
+      if (Date.now() - startedAt > STABLE_UPTIME_MS) crashRestarts = 0
+      handleServerCrash(code)
     }
   })
   await waitForServer(serverPort)
   log('服务已就绪')
+}
+
+/** Automatically restarts the dsh service after an unexpected exit, with a retry limit. */
+async function handleServerCrash(code) {
+  if (crashRestarts >= CRASH_RESTART_LIMIT) {
+    dialog.showErrorBox('dsh web 服务已退出', `退出码：${code}。自动重启多次失败，请检查日志后重启应用。`)
+    return
+  }
+  crashRestarts++
+  log(`dsh web 服务意外退出（退出码 ${code}），自动重启（第 ${crashRestarts}/${CRASH_RESTART_LIMIT} 次）...`)
+  try {
+    await startServer(activeNodeDir)
+    if (mainWin && !mainWin.isDestroyed()) mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
+    log('服务已自动恢复')
+  } catch (e) {
+    dialog.showErrorBox('dsh web 服务重启失败', e.message)
+  }
 }
 
 function stopServer() {
@@ -424,6 +472,20 @@ function stopServer() {
   }
 }
 
+/** Hardens a window: external links open in the browser, no webviews, minimal permissions. */
+function secureWindow(win) {
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://') || url.startsWith('http://')) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url.startsWith('file://') || url.startsWith(`http://127.0.0.1:${serverPort}`)) return
+    e.preventDefault()
+    if (url.startsWith('https://') || url.startsWith('http://')) shell.openExternal(url)
+  })
+  win.webContents.on('will-attach-webview', (e) => e.preventDefault())
+}
+
 function createSetupWindow() {
   setupWin = new BrowserWindow({
     width: 720,
@@ -437,6 +499,7 @@ function createSetupWindow() {
     },
   })
   setupWin.setMenuBarVisibility(false)
+  secureWindow(setupWin)
   setupWin.webContents.on('did-finish-load', () => {
     setupWin.webContents.send('setup-status', lastStatus)
     setupWin.webContents.send('setup-step', lastStep)
@@ -453,7 +516,7 @@ function overlayColors() {
     : { color: '#f7f7f8', symbolColor: '#555555', height: 34 }
 }
 
-function createMainWindow() {
+function createMainWindow({ splash = false } = {}) {
   const saved = readState().windowBounds || {}
   mainWin = new BrowserWindow({
     width: saved.width || 1280,
@@ -478,16 +541,32 @@ function createMainWindow() {
     nativeTheme.on('updated', applyOverlay)
     mainWin.on('closed', () => nativeTheme.removeListener('updated', applyOverlay))
   }
+  mainWin.webContents.on('before-input-event', (e, input) => {
+    if (input.type !== 'keyDown' || !(isMac ? input.meta : input.control)) return
+    const wc = mainWin.webContents
+    let level = null
+    if (input.key === '=' || input.key === '+') level = Math.min(wc.getZoomLevel() + 0.5, 5)
+    else if (input.key === '-') level = Math.max(wc.getZoomLevel() - 0.5, -5)
+    else if (input.key === '0') level = 0
+    if (level !== null) {
+      e.preventDefault()
+      wc.setZoomLevel(level)
+      const state = readState()
+      state.zoomLevel = level
+      writeState(state)
+    }
+  })
   mainWin.webContents.on('did-finish-load', () => {
+    if (!mainWin.webContents.getURL().startsWith('http')) return
+    const savedZoom = readState().zoomLevel
+    if (typeof savedZoom === 'number') mainWin.webContents.setZoomLevel(savedZoom)
     mainWin.webContents.insertCSS(
       'body::before{content:"";position:fixed;top:0;left:0;right:140px;height:10px;z-index:2147483647;-webkit-app-region:drag;}',
     )
   })
-  mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
-  mainWin.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
-    return { action: 'deny' }
-  })
+  if (splash) mainWin.loadFile(path.join(__dirname, 'splash.html'))
+  else mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
+  secureWindow(mainWin)
   const saveBounds = () => {
     if (!mainWin || mainWin.isDestroyed() || mainWin.isMinimized()) return
     const state = readState()
@@ -544,6 +623,7 @@ function createSettingsWindow() {
     },
   })
   settingsWin.setMenuBarVisibility(false)
+  secureWindow(settingsWin)
   settingsWin.loadFile(path.join(__dirname, 'settings.html'))
   settingsWin.on('closed', () => {
     settingsWin = null
@@ -568,6 +648,7 @@ function createLogsWindow() {
     },
   })
   logsWin.setMenuBarVisibility(false)
+  secureWindow(logsWin)
   logsWin.loadFile(path.join(__dirname, 'logs.html'))
   logsWin.on('closed', () => {
     logsWin = null
@@ -671,6 +752,9 @@ function applyLoginItem(settings) {
   }
 }
 
+const APP_UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000
+let appUpdateTimer = null
+
 async function checkAppUpdate() {
   if (!app.isPackaged) return
   try {
@@ -682,25 +766,65 @@ async function checkAppUpdate() {
   }
 }
 
+/** Offers retry / view logs / quit when startup fails, looping until resolved. */
+async function showBootFailure(message) {
+  const win = setupWin && !setupWin.isDestroyed() ? setupWin : mainWin && !mainWin.isDestroyed() ? mainWin : null
+  const options = {
+    type: 'error',
+    title: '启动失败',
+    message: 'DSH Desktop 启动失败',
+    detail: `${message}\n\n你可以重试，或打开控制台日志查看详情。`,
+    buttons: ['重试', '查看日志', '退出'],
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true,
+  }
+  const { response } = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options)
+  if (response === 0) {
+    boot()
+  } else if (response === 1) {
+    createLogsWindow()
+    showBootFailure(message)
+  } else {
+    quitting = true
+    app.quit()
+  }
+}
+
+let booting = false
+
 async function boot() {
-  createSetupWindow()
+  if (booting) return
+  booting = true
+  const firstRun = !dshEntry()
+  if (firstRun) {
+    if (!setupWin || setupWin.isDestroyed()) createSetupWindow()
+  } else if (!mainWin || mainWin.isDestroyed()) {
+    Menu.setApplicationMenu(null)
+    createMainWindow({ splash: true })
+  }
   try {
     const nodeDir = await ensureNode()
     await ensureDsh(nodeDir)
     await startServer(nodeDir)
     activeNodeDir = nodeDir
     Menu.setApplicationMenu(null)
-    createTray()
-    createMainWindow()
+    if (!tray) createTray()
+    if (mainWin && !mainWin.isDestroyed()) mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
+    else createMainWindow()
     if (process.env.DSH_DESKTOP_SETTINGS === '1') createSettingsWindow()
     if (setupWin && !setupWin.isDestroyed()) setupWin.close()
     setupWin = null
     checkAppUpdate()
+    if (!appUpdateTimer) appUpdateTimer = setInterval(checkAppUpdate, APP_UPDATE_INTERVAL_MS)
   } catch (e) {
     setStatus('启动失败')
     log(`错误：${e.message}`)
-    dialog.showErrorBox('启动失败', e.message)
+    booting = false
+    showBootFailure(e.message)
+    return
   }
+  booting = false
 }
 
 ipcMain.handle('app-version', () => app.getVersion())
@@ -741,4 +865,11 @@ app.on('window-all-closed', () => {
   if (!tray || quitting) app.quit()
 })
 
-app.whenReady().then(boot)
+app.on('activate', showMainWindow)
+
+if (app.requestSingleInstanceLock()) {
+  app.on('second-instance', showMainWindow)
+  app.whenReady().then(boot)
+} else {
+  app.quit()
+}

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; img-src 'self'" />
+  <title>DSH Desktop</title>
+  <style>
+    :root { color-scheme: light dark; --accent: #2B6CEA; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      display: grid;
+      place-items: center;
+      font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f7f7f8;
+      color: #1f2328;
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+    main { display: grid; justify-items: center; gap: 16px; text-align: center; }
+    .mark { width: 72px; height: 72px; border-radius: 18px; animation: breathe 1.9s ease-in-out infinite; }
+    .title { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+    .hint { margin: -8px 0 0; font-size: 12px; color: #77797e; }
+    .track { width: 168px; height: 3px; overflow: hidden; border-radius: 99px; background: rgba(20, 21, 24, 0.09); }
+    .bar { width: 42%; height: 100%; border-radius: inherit; background: var(--accent); animation: travel 1.25s ease-in-out infinite; }
+    @keyframes breathe { 0%, 100% { transform: scale(0.97); opacity: 0.86; } 50% { transform: scale(1); opacity: 1; } }
+    @keyframes travel { 0% { transform: translateX(-105%); } 100% { transform: translateX(345%); } }
+    @media (prefers-color-scheme: dark) {
+      body { background: #1a1b1e; color: #e6edf3; }
+      .hint { color: #9ca0a8; }
+      .track { background: rgba(255, 255, 255, 0.11); }
+    }
+    @media (prefers-reduced-motion: reduce) { .mark, .bar { animation: none; } .bar { width: 100%; opacity: 0.6; } }
+  </style>
+</head>
+<body>
+  <main>
+    <img class="mark" src="icon.png" alt="" />
+    <h1 class="title">正在启动 DSH Desktop</h1>
+    <p class="hint">服务启动中，马上就好</p>
+    <div class="track" aria-hidden="true"><div class="bar"></div></div>
+  </main>
+</body>
+</html>
