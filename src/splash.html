@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; img-src 'self'" />
   <title>DSH Desktop</title>
   <style>
-    :root { color-scheme: light dark; --accent: #2B6CEA; }
+    :root { color-scheme: light dark; --accent: #fb923c; --accent2: #f43f5e; --accent3: #a78bfa; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
     body {
       display: grid;
@@ -15,26 +15,60 @@
       color: #1f2328;
       user-select: none;
       -webkit-app-region: drag;
+      position: relative;
     }
-    main { display: grid; justify-items: center; gap: 16px; text-align: center; }
-    .mark { width: 72px; height: 72px; border-radius: 18px; animation: breathe 1.9s ease-in-out infinite; }
+    .glow {
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.14;
+      background: radial-gradient(circle, var(--accent) 0%, transparent 65%);
+      animation: pulse-glow 4.5s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes pulse-glow { 0%, 100% { transform: scale(0.9); opacity: 0.1; } 50% { transform: scale(1.1); opacity: 0.2; } }
+    main { display: grid; justify-items: center; gap: 16px; text-align: center; z-index: 1; }
+    .stage { position: relative; width: 118px; height: 118px; display: grid; place-items: center; }
+    .halo {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent 0deg, var(--accent) 100deg, var(--accent2) 170deg, transparent 240deg);
+      animation: spin 2.2s linear infinite;
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+      filter: drop-shadow(0 0 6px rgba(251, 146, 60, 0.55));
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .mark { width: 72px; height: 72px; border-radius: 18px; animation: breathe 1.9s ease-in-out infinite; box-shadow: 0 6px 26px rgba(251, 146, 60, 0.28); }
     .title { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
     .hint { margin: -8px 0 0; font-size: 12px; color: #77797e; }
-    .track { width: 168px; height: 3px; overflow: hidden; border-radius: 99px; background: rgba(20, 21, 24, 0.09); }
-    .bar { width: 42%; height: 100%; border-radius: inherit; background: var(--accent); animation: travel 1.25s ease-in-out infinite; }
-    @keyframes breathe { 0%, 100% { transform: scale(0.97); opacity: 0.86; } 50% { transform: scale(1); opacity: 1; } }
+    .track { width: 176px; height: 3px; overflow: hidden; border-radius: 99px; background: rgba(20, 21, 24, 0.09); }
+    .bar { width: 42%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent2)); animation: travel 1.25s ease-in-out infinite; box-shadow: 0 0 8px rgba(251, 146, 60, 0.6); }
+    @keyframes breathe { 0%, 100% { transform: scale(0.97); opacity: 0.88; } 50% { transform: scale(1); opacity: 1; } }
     @keyframes travel { 0% { transform: translateX(-105%); } 100% { transform: translateX(345%); } }
     @media (prefers-color-scheme: dark) {
       body { background: #1a1b1e; color: #e6edf3; }
       .hint { color: #9ca0a8; }
       .track { background: rgba(255, 255, 255, 0.11); }
+      .glow { opacity: 0.2; }
     }
-    @media (prefers-reduced-motion: reduce) { .mark, .bar { animation: none; } .bar { width: 100%; opacity: 0.6; } }
+    @media (prefers-reduced-motion: reduce) {
+      .mark, .bar, .halo, .glow { animation: none; }
+      .halo, .glow { display: none; }
+      .bar { width: 100%; opacity: 0.6; }
+    }
   </style>
 </head>
 <body>
+  <div class="glow"></div>
   <main>
-    <img class="mark" src="icon.png" alt="" />
+    <div class="stage">
+      <div class="halo"></div>
+      <img class="mark" src="icon.png" alt="" />
+    </div>
     <h1 class="title">正在启动 DSH Desktop</h1>
     <p class="hint">服务启动中，马上就好</p>
     <div class="track" aria-hidden="true"><div class="bar"></div></div>

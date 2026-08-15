@@ -1,35 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#38BDF8"/>
-      <stop offset="1" stop-color="#1D4ED8"/>
+      <stop offset="0" stop-color="#FB923C"/>
+      <stop offset="1" stop-color="#DC2626"/>
     </linearGradient>
-    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#DBEAFE"/>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFF7ED"/>
+      <stop offset="1" stop-color="#FFEDD5"/>
     </linearGradient>
   </defs>
   <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
-  <!-- spout -->
-  <path d="M208 128 C204 100 186 86 166 84 C186 74 214 82 224 106 C234 82 262 74 282 84 C262 86 244 100 240 128 Z" fill="#E0F2FE" opacity="0.95"/>
-  <!-- whale body -->
-  <path d="M96 292
-           C96 214 158 158 234 158
-           C312 158 366 214 372 278
-           C388 264 410 254 434 258
-           C424 274 420 292 424 310
-           C420 328 424 346 434 362
-           C410 366 388 356 372 342
-           C356 386 306 414 240 414
-           C156 414 96 362 96 292 Z" fill="url(#body)"/>
-  <!-- belly lines -->
-  <path d="M132 340 C180 372 260 378 320 356" fill="none" stroke="#93C5FD" stroke-width="14" stroke-linecap="round"/>
-  <path d="M144 372 C190 396 252 400 302 386" fill="none" stroke="#93C5FD" stroke-width="12" stroke-linecap="round" opacity="0.8"/>
-  <!-- eye -->
-  <circle cx="196" cy="252" r="20" fill="#0F172A"/>
-  <circle cx="203" cy="245" r="7" fill="#FFFFFF"/>
+  <!-- ears -->
+  <path d="M118 96 L196 176 L112 208 Z" fill="url(#face)"/>
+  <path d="M394 96 L316 176 L400 208 Z" fill="url(#face)"/>
+  <path d="M136 122 L188 176 L132 196 Z" fill="#F97316"/>
+  <path d="M376 122 L324 176 L380 196 Z" fill="#F97316"/>
+  <!-- head -->
+  <path d="M256 150
+           C336 150 398 196 398 262
+           C398 300 378 334 342 358
+           C318 396 290 418 256 418
+           C222 418 194 396 170 358
+           C134 334 114 300 114 262
+           C114 196 176 150 256 150 Z" fill="url(#face)"/>
+  <!-- inner face patches -->
+  <path d="M256 176 C310 176 356 208 362 256 C356 300 320 330 300 340 C284 322 270 314 256 314 C242 314 228 322 212 340 C192 330 156 300 150 256 C156 208 202 176 256 176 Z" fill="#FB923C"/>
+  <!-- eyes -->
+  <circle cx="196" cy="258" r="18" fill="#1C1917"/>
+  <circle cx="316" cy="258" r="18" fill="#1C1917"/>
+  <circle cx="202" cy="251" r="6" fill="#FFFFFF"/>
+  <circle cx="322" cy="251" r="6" fill="#FFFFFF"/>
+  <!-- nose -->
+  <path d="M236 328 L276 328 L256 352 Z" fill="#1C1917"/>
   <!-- smile -->
-  <path d="M236 288 C252 300 274 300 290 288" fill="none" stroke="#0F172A" stroke-width="12" stroke-linecap="round"/>
-  <!-- cheek -->
-  <circle cx="152" cy="292" r="14" fill="#FCA5A5" opacity="0.85"/>
+  <path d="M226 372 C244 386 268 386 286 372" fill="none" stroke="#1C1917" stroke-width="11" stroke-linecap="round"/>
 </svg>

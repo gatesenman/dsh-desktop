@@ -13,6 +13,8 @@ function renderSteps() {
   for (let i = 1; i <= TOTAL_STEPS; i++) {
     const el = document.getElementById(`step${i}`)
     el.className = 'step' + (i < currentStep ? ' done' : i === currentStep ? ' active' : '')
+    const link = document.getElementById(`link${i}`)
+    if (link) link.className = 'link' + (i < currentStep ? ' fill' : '')
   }
   if (currentStep > 0) {
     barEl.style.width = `${((currentStep - 1) / TOTAL_STEPS) * 100}%`
