@@ -1,6 +1,6 @@
 'use strict'
 
-const { app, BrowserWindow, Menu, Notification, Tray, clipboard, dialog, ipcMain, shell, nativeImage, nativeTheme, powerMonitor } = require('electron')
+const { app, BrowserWindow, Menu, Notification, Tray, clipboard, dialog, globalShortcut, ipcMain, shell, nativeImage, nativeTheme, powerMonitor } = require('electron')
 const { spawn, spawnSync } = require('child_process')
 const fs = require('fs')
 const http = require('http')
@@ -1153,10 +1153,242 @@ function workspaceMenu() {
   return items
 }
 
+// ---------------------------------------------------------------------------
+// Agent inbox: quick tasks and scheduled tasks running through `dsh --profile
+// headless`, with results collected in a local inbox.
+// ---------------------------------------------------------------------------
+
+const TASK_LIMIT = 200
+const TASK_OUTPUT_LIMIT = 200 * 1024
+const TASK_TIMEOUT_MS = 15 * 60 * 1000
+const QUICK_TASK_SHORTCUT = 'CommandOrControl+Alt+Space'
+
+let inboxWin = null
+let quickWin = null
+const runningTasks = new Map()
+
+function tasksPath() {
+  return path.join(userDir(), 'tasks.json')
+}
+
+function readTasks() {
+  try {
+    const data = JSON.parse(fs.readFileSync(tasksPath(), 'utf8'))
+    return { tasks: data.tasks || [], schedules: data.schedules || [] }
+  } catch {
+    return { tasks: [], schedules: [] }
+  }
+}
+
+function writeTasks(data) {
+  fs.mkdirSync(userDir(), { recursive: true })
+  fs.writeFileSync(tasksPath(), JSON.stringify(data, null, 2))
+}
+
+function sendInboxEvent() {
+  if (inboxWin && !inboxWin.isDestroyed()) inboxWin.webContents.send('inbox-changed')
+  updateTray()
+}
+
+function patchTask(id, patch) {
+  const data = readTasks()
+  const task = data.tasks.find((t) => t.id === id)
+  if (!task) return
+  Object.assign(task, patch)
+  writeTasks(data)
+  sendInboxEvent()
+}
+
+/** Runs one task through the upstream headless profile and records the result in the inbox. */
+function runHeadlessTask(prompt, source) {
+  const entry = dshEntry()
+  if (!entry || !activeNodeDir) {
+    dialog.showErrorBox('无法运行任务', 'dsh 尚未就绪，请等待服务启动完成')
+    return null
+  }
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const data = readTasks()
+  data.tasks.unshift({ id, prompt, source, status: 'running', createdAt: Date.now() })
+  data.tasks.length = Math.min(data.tasks.length, TASK_LIMIT)
+  writeTasks(data)
+  sendInboxEvent()
+  log(`收件箱任务开始（${source}）：${prompt.slice(0, 80)}`)
+  const proc = spawn(nodeBin(activeNodeDir), [entry, '--profile', 'headless', prompt], {
+    env: envWithNode(activeNodeDir),
+    cwd: workspaceDir() || undefined,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: !isWin,
+  })
+  runningTasks.set(id, proc)
+  let output = ''
+  let errput = ''
+  const collect = (buf, chunk) => (buf.length > TASK_OUTPUT_LIMIT ? buf : buf + chunk)
+  proc.stdout.on('data', (b) => (output = collect(output, b.toString())))
+  proc.stderr.on('data', (b) => (errput = collect(errput, b.toString())))
+  const timer = setTimeout(() => {
+    log(`收件箱任务超时，已终止：${prompt.slice(0, 80)}`)
+    killTaskProc(proc)
+  }, TASK_TIMEOUT_MS)
+  proc.on('exit', (code) => {
+    clearTimeout(timer)
+    runningTasks.delete(id)
+    const ok = code === 0
+    patchTask(id, {
+      status: ok ? 'done' : 'error',
+      finishedAt: Date.now(),
+      output: (ok ? output : output + errput).trim().slice(0, TASK_OUTPUT_LIMIT),
+    })
+    log(`收件箱任务${ok ? '完成' : '失败'}（退出码 ${code}）：${prompt.slice(0, 80)}`)
+    if (Notification.isSupported()) {
+      const n = new Notification({
+        title: ok ? 'Agent 任务完成' : 'Agent 任务失败',
+        body: prompt.slice(0, 100),
+        icon: path.join(__dirname, 'icon.png'),
+      })
+      n.on('click', createInboxWindow)
+      n.show()
+    }
+  })
+  return id
+}
+
+function killTaskProc(proc) {
+  try {
+    if (isWin) spawnSync('taskkill', ['/pid', String(proc.pid), '/t', '/f'])
+    else process.kill(-proc.pid, 'SIGKILL')
+  } catch {
+    // process already gone
+  }
+}
+
+function cancelTask(id) {
+  const proc = runningTasks.get(id)
+  if (proc) killTaskProc(proc)
+}
+
+// --- Scheduled tasks -------------------------------------------------------
+
+const SCHEDULE_TICK_MS = 60 * 1000
+let scheduleTimer = null
+
+/** Whether a schedule is due at `now`, given its last run time. */
+function scheduleDue(schedule, now) {
+  if (schedule.disabled) return false
+  const last = schedule.lastRun || 0
+  if (schedule.type === 'interval') {
+    const hours = Math.max(1, Number(schedule.everyHours) || 24)
+    return now - last >= hours * 60 * 60 * 1000
+  }
+  const [h, m] = String(schedule.time || '09:00')
+    .split(':')
+    .map(Number)
+  const today = new Date(now)
+  today.setHours(h || 0, m || 0, 0, 0)
+  return now >= today.getTime() && last < today.getTime()
+}
+
+function tickSchedules() {
+  if (!activeNodeDir || updating || restarting) return
+  const now = Date.now()
+  const due = readTasks().schedules.filter((s) => scheduleDue(s, now))
+  if (!due.length) return
+  const data = readTasks()
+  for (const schedule of due) {
+    const target = data.schedules.find((s) => s.id === schedule.id)
+    if (target) target.lastRun = now
+  }
+  writeTasks(data)
+  for (const schedule of due) runHeadlessTask(schedule.prompt, `定时：${schedule.name}`)
+}
+
+function startScheduler() {
+  if (scheduleTimer) return
+  scheduleTimer = setInterval(tickSchedules, SCHEDULE_TICK_MS)
+}
+
+// --- Inbox and quick-task windows ------------------------------------------
+
+function createInboxWindow() {
+  if (inboxWin && !inboxWin.isDestroyed()) {
+    inboxWin.show()
+    inboxWin.focus()
+    return
+  }
+  inboxWin = new BrowserWindow({
+    width: 720,
+    height: 640,
+    backgroundColor: themeBackground(),
+    icon: path.join(__dirname, 'icon.png'),
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+  inboxWin.setMenuBarVisibility(false)
+  secureWindow(inboxWin)
+  inboxWin.loadFile(path.join(__dirname, 'inbox.html'))
+  inboxWin.on('closed', () => {
+    inboxWin = null
+  })
+}
+
+function toggleQuickWindow() {
+  if (quickWin && !quickWin.isDestroyed()) {
+    if (quickWin.isVisible()) quickWin.hide()
+    else {
+      quickWin.show()
+      quickWin.focus()
+    }
+    return
+  }
+  quickWin = new BrowserWindow({
+    width: 640,
+    height: 120,
+    frame: false,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    backgroundColor: themeBackground(),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+  secureWindow(quickWin)
+  quickWin.loadFile(path.join(__dirname, 'quick.html'))
+  quickWin.once('ready-to-show', () => {
+    quickWin.show()
+    quickWin.focus()
+  })
+  quickWin.on('blur', () => {
+    if (quickWin && !quickWin.isDestroyed()) quickWin.hide()
+  })
+  quickWin.on('closed', () => {
+    quickWin = null
+  })
+}
+
+function registerQuickTaskShortcut() {
+  try {
+    if (!globalShortcut.register(QUICK_TASK_SHORTCUT, toggleQuickWindow)) {
+      log(`快速任务快捷键注册失败（${QUICK_TASK_SHORTCUT} 可能已被占用）`)
+    }
+  } catch (e) {
+    log(`快速任务快捷键注册失败：${e.message}`)
+  }
+}
+
 function trayMenuTemplate() {
   const prev = rollbackCandidate()
+  const running = runningTasks.size
   return [
     { label: '显示主窗口', click: showMainWindow },
+    { label: running ? `Agent 收件箱（${running} 个进行中）` : 'Agent 收件箱', click: createInboxWindow },
+    { label: '快速任务（Ctrl/Cmd+Alt+Space）', click: toggleQuickWindow },
     { label: '工作目录', submenu: workspaceMenu() },
     { label: '设置', click: createSettingsWindow },
     { label: '检查 dsh 更新', click: () => manualDshUpdate() },
@@ -1285,9 +1517,12 @@ async function boot() {
     if (mainWin && !mainWin.isDestroyed()) mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
     else createMainWindow()
     if (process.env.DSH_DESKTOP_SETTINGS === '1') createSettingsWindow()
+    if (process.env.DSH_DESKTOP_INBOX === '1') createInboxWindow()
     if (setupWin && !setupWin.isDestroyed()) setupWin.close()
     setupWin = null
     scheduleUpdateChecks()
+    registerQuickTaskShortcut()
+    startScheduler()
   } catch (e) {
     setStatus('启动失败')
     log(`错误：${e.message}`)
@@ -1317,6 +1552,44 @@ ipcMain.handle('run-doctor', () => runDoctor())
 ipcMain.handle('backup-data', () => backupData())
 ipcMain.handle('restore-data', () => restoreData())
 ipcMain.handle('rollback-dsh', () => rollbackDsh())
+ipcMain.handle('inbox-list', () => readTasks())
+ipcMain.handle('inbox-run', (_e, prompt) => runHeadlessTask(String(prompt || '').trim(), '快速任务'))
+ipcMain.handle('inbox-cancel', (_e, id) => cancelTask(id))
+ipcMain.handle('inbox-delete', (_e, id) => {
+  cancelTask(id)
+  const data = readTasks()
+  data.tasks = data.tasks.filter((t) => t.id !== id)
+  writeTasks(data)
+  sendInboxEvent()
+})
+ipcMain.handle('inbox-clear', () => {
+  const data = readTasks()
+  data.tasks = data.tasks.filter((t) => t.status === 'running')
+  writeTasks(data)
+  sendInboxEvent()
+})
+ipcMain.handle('schedule-save', (_e, schedule) => {
+  const data = readTasks()
+  const existing = data.schedules.find((s) => s.id === schedule.id)
+  if (existing) Object.assign(existing, schedule)
+  else data.schedules.push({ ...schedule, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` })
+  writeTasks(data)
+  sendInboxEvent()
+})
+ipcMain.handle('schedule-delete', (_e, id) => {
+  const data = readTasks()
+  data.schedules = data.schedules.filter((s) => s.id !== id)
+  writeTasks(data)
+  sendInboxEvent()
+})
+ipcMain.handle('quick-submit', (_e, prompt) => {
+  if (quickWin && !quickWin.isDestroyed()) quickWin.hide()
+  const text = String(prompt || '').trim()
+  if (text) runHeadlessTask(text, '快速任务')
+})
+ipcMain.handle('quick-hide', () => {
+  if (quickWin && !quickWin.isDestroyed()) quickWin.hide()
+})
 ipcMain.handle('open-data-dir', () => shell.openPath(userDir()))
 ipcMain.handle('open-logs', () => createLogsWindow())
 ipcMain.handle('restart-service', () => restartService())
@@ -1335,6 +1608,12 @@ ipcMain.handle('export-logs', async () => {
 app.on('before-quit', () => {
   quitting = true
   stopServer()
+  for (const proc of runningTasks.values()) killTaskProc(proc)
+  runningTasks.clear()
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })
 
 app.on('window-all-closed', () => {

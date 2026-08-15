@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; img-src 'self'" />
+  <title>Agent 收件箱 — DSH Desktop</title>
+  <style>
+    :root { --accent: #2B6CEA; }
+    body {
+      margin: 0;
+      font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      padding: 20px 24px;
+      user-select: none;
+    }
+    .titlebar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .titlebar img { width: 28px; height: 28px; }
+    h1 { font-size: 17px; margin: 0; font-weight: 600; flex: 1; }
+    .group-title {
+      font-size: 12px; color: #8b949e; text-transform: uppercase;
+      letter-spacing: 0.05em; margin: 14px 0 6px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .group {
+      background: #161b22; border: 1px solid #21262d; border-radius: 10px;
+      padding: 10px 14px; margin-bottom: 12px;
+    }
+    button {
+      background: var(--accent); color: #fff; border: none; border-radius: 8px;
+      padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 500;
+    }
+    button:hover { filter: brightness(1.1); }
+    button.secondary { background: #21262d; border: 1px solid #30363d; }
+    button.small { padding: 3px 10px; font-size: 12px; }
+    button:disabled { opacity: 0.6; cursor: default; }
+    input[type="text"], input[type="time"], input[type="number"], select {
+      background: #0d1117; border: 1px solid #30363d; border-radius: 8px;
+      color: #e6edf3; padding: 8px 10px; font-size: 13px; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+    .run-row { display: flex; gap: 8px; margin-bottom: 4px; }
+    .run-row input { flex: 1; }
+    .task { border-bottom: 1px solid #21262d; padding: 10px 0; }
+    .task:last-child { border-bottom: none; }
+    .task-head { display: flex; align-items: center; gap: 8px; }
+    .task-prompt { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .badge { font-size: 11px; border-radius: 20px; padding: 2px 9px; flex: none; }
+    .badge.running { background: rgba(43,108,234,0.18); color: #6ea8ff; }
+    .badge.done { background: rgba(63,185,80,0.15); color: #3fb950; }
+    .badge.error { background: rgba(248,81,73,0.15); color: #f85149; }
+    .task-meta { font-size: 11px; color: #8b949e; margin-top: 3px; }
+    .task-output {
+      display: none; margin-top: 8px; padding: 10px 12px; background: #0d1117;
+      border: 1px solid #21262d; border-radius: 8px; font-size: 12.5px;
+      white-space: pre-wrap; word-break: break-word; max-height: 260px;
+      overflow: auto; user-select: text; line-height: 1.6;
+    }
+    .task.open .task-output { display: block; }
+    .empty { color: #8b949e; font-size: 13px; padding: 14px 0; text-align: center; }
+    .sched { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #21262d; padding: 9px 0; }
+    .sched:last-child { border-bottom: none; }
+    .sched-name { font-size: 13.5px; flex: none; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sched-desc { font-size: 12px; color: #8b949e; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sched.disabled .sched-name, .sched.disabled .sched-desc { opacity: 0.45; }
+    #schedForm { display: none; flex-wrap: wrap; gap: 8px; padding: 10px 0 4px; align-items: center; }
+    #schedForm.show { display: flex; }
+    #schedForm input[type="text"] { flex: 1; min-width: 120px; }
+  </style>
+</head>
+<body>
+  <div class="titlebar">
+    <img src="icon.png" alt="" />
+    <h1>Agent 收件箱</h1>
+    <button id="clearBtn" class="secondary small">清空已完成</button>
+  </div>
+
+  <div class="group">
+    <div class="run-row">
+      <input type="text" id="promptInput" placeholder="输入一句话任务，后台跑完在这里看结果（也可用 Ctrl/Cmd+Alt+Space 快速呼出）" />
+      <button id="runBtn">运行</button>
+    </div>
+  </div>
+
+  <div class="group-title">定时任务 <button id="addSchedBtn" class="secondary small">新增</button></div>
+  <div class="group">
+    <div id="schedForm">
+      <input type="text" id="schedName" placeholder="名称" style="max-width:130px" />
+      <input type="text" id="schedPrompt" placeholder="任务内容" />
+      <select id="schedType">
+        <option value="daily">每天</option>
+        <option value="interval">每隔</option>
+      </select>
+      <input type="time" id="schedTime" value="09:00" />
+      <input type="number" id="schedHours" value="24" min="1" max="168" style="width:64px;display:none" />
+      <span id="schedHoursUnit" style="font-size:12px;color:#8b949e;display:none">小时</span>
+      <button id="schedSaveBtn" class="small">保存</button>
+      <button id="schedCancelBtn" class="secondary small">取消</button>
+    </div>
+    <div id="schedList"></div>
+  </div>
+
+  <div class="group-title">任务结果</div>
+  <div class="group" id="taskList"></div>
+
+  <script src="inbox.js"></script>
+</body>
+</html>

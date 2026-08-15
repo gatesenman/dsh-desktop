@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; img-src 'self'" />
+  <title>快速任务</title>
+  <style>
+    :root { --accent: #2B6CEA; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 18px;
+      box-sizing: border-box;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      overflow: hidden;
+      user-select: none;
+    }
+    .row { display: flex; align-items: center; gap: 10px; }
+    .row img { width: 26px; height: 26px; flex: none; }
+    input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #e6edf3;
+      font-size: 16px;
+      padding: 10px 0;
+    }
+    input::placeholder { color: #8b949e; }
+    .hint { font-size: 11.5px; color: #8b949e; padding: 0 0 6px 36px; }
+  </style>
+</head>
+<body>
+  <div class="row">
+    <img src="icon.png" alt="" />
+    <input type="text" id="quickInput" placeholder="一句话任务，回车后台运行..." autofocus />
+  </div>
+  <div class="hint">Enter 运行 · Esc 关闭 · 结果在「Agent 收件箱」和系统通知里查看</div>
+  <script src="quick.js"></script>
+</body>
+</html>
