@@ -66,14 +66,6 @@ The installer bundles a Node.js runtime, so first-time setup succeeds even offli
 
 ## Screenshots
 
-**First-launch install animation** (environment check → prepare Node.js → install dsh → start service):
-
-![First-launch setup](assets/setup.png)
-
-**Lightweight startup splash** (follows the system light/dark theme):
-
-![Startup splash](assets/splash.png)
-
 **Main window** (embedded official Web UI, immersive frameless design):
 
 ![Main window](assets/main-window.png)
@@ -82,17 +74,9 @@ The installer bundles a Node.js runtime, so first-time setup succeeds even offli
 
 ![Agent inbox](assets/inbox.png)
 
-**Quick task** (summoned with the global shortcut `Ctrl/Cmd+Alt+Space`):
-
-![Quick task](assets/quick.png)
-
 **Settings** (auto-start, tray, updates, maintenance tools):
 
 ![Settings](assets/settings.png)
-
-**Console logs** (live view, copy, export):
-
-![Console logs](assets/logs.png)
 
 ## Keyboard shortcuts
 

@@ -65,14 +65,6 @@ DSH Desktop 将官方发布的 [`@deepseek-ai/dsh`](https://github.com/deepseek-
 
 ## 界面预览
 
-**首次启动安装动画**（检测环境 → 准备 Node.js → 安装 dsh → 启动服务）：
-
-![首次启动安装](assets/setup.png)
-
-**二次启动轻量 splash**（跟随系统深浅色主题）：
-
-![启动 splash](assets/splash.png)
-
 **主窗口**（内嵌官方 Web UI，沉浸式无边框）：
 
 ![主窗口](assets/main-window.png)
@@ -81,17 +73,9 @@ DSH Desktop 将官方发布的 [`@deepseek-ai/dsh`](https://github.com/deepseek-
 
 ![Agent 收件箱](assets/inbox.png)
 
-**快速任务**（全局快捷键 `Ctrl/Cmd+Alt+Space` 呼出）：
-
-![快速任务](assets/quick.png)
-
 **设置**（开机自启、托盘、更新、维护工具）：
 
 ![设置](assets/settings.png)
-
-**控制台日志**（实时查看、复制、导出）：
-
-![控制台日志](assets/logs.png)
 
 ## 快捷键
 
