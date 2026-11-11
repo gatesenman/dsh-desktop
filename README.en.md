@@ -78,6 +78,8 @@ The installer bundles a Node.js runtime, so first-time setup succeeds even offli
 
 ![Settings](assets/settings.png)
 
+> Captured by running the app on Linux (xvfb): on first launch it installed `@deepseek-ai/dsh` 0.2.2-rc.1 and started `dsh web`. The embedded Web UI is in English (dsh's default); the app's own windows (settings, inbox) are Chinese only.
+
 ## Keyboard shortcuts
 
 | Shortcut | Action |

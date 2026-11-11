@@ -77,6 +77,8 @@ DSH Desktop 将官方发布的 [`@deepseek-ai/dsh`](https://github.com/deepseek-
 
 ![设置](assets/settings.png)
 
+> 截图在 Linux（xvfb）中实际运行本应用拍摄：首次启动自动安装 `@deepseek-ai/dsh` 0.2.2-rc.1 并启动 `dsh web`。主窗口中的 Web UI 为英文（dsh 默认语言）；应用自身的设置、收件箱等窗口只有中文。
+
 ## 快捷键
 
 | 快捷键 | 功能 |
