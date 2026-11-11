@@ -97,6 +97,36 @@ npm run dist     # build the installer for the current platform
 
 Pushing a `v*` tag triggers GitHub Actions to build and publish a Release on macOS, Windows, and Linux.
 
+## Tech stack
+
+- **Electron 43** (main process `src/main.js`; renderers run with context isolation on and Node integration off)
+- **electron-builder 26**: macOS dmg/zip, Windows NSIS, Linux AppImage/deb
+- **electron-updater**: auto-update from GitHub Releases
+- `build/prepare-node-runtime.js` downloads and bundles a Node.js 24.8.0 runtime before packaging
+- Embeds the `dsh web` service from the official npm package `@deepseek-ai/dsh`
+- Plain HTML/JS pages (setup, splash, inbox, quick task, settings, logs) — no front-end framework
+- GitHub Actions (`.github/workflows/release.yml`): builds and publishes on all three platforms when a `v*` tag is pushed
+
+## Project structure
+
+```text
+dsh-desktop/
+├── src/
+│   ├── main.js            # main process: install/start dsh, tray, shortcuts, tasks, backup, doctor, updates
+│   ├── preload.js         # secure renderer bridge (contextBridge)
+│   ├── setup.html/.js     # first-launch setup
+│   ├── splash.html        # splash screen
+│   ├── inbox.html/.js     # agent inbox and scheduled tasks
+│   ├── quick.html/.js     # global quick-task bar
+│   ├── settings.html/.js  # settings
+│   └── logs.html/.js      # log viewer
+├── build/
+│   ├── icon.png / icon.svg
+│   └── prepare-node-runtime.js   # prepares the bundled Node.js runtime before packaging
+├── assets/                # README screenshots
+└── .github/workflows/release.yml
+```
+
 ## Data directory
 
 The Node.js runtime, versioned dsh installations, task records, logs, and state files live in the app's user data directory:
@@ -106,6 +136,10 @@ The Node.js runtime, versioned dsh installations, task records, logs, and state 
 | macOS | `~/Library/Application Support/dsh-desktop` |
 | Windows | `%APPDATA%/dsh-desktop` |
 | Linux | `~/.config/dsh-desktop` |
+
+## Contributing
+
+Issues and pull requests are welcome. This project only adds peripheral desktop-shell features — please don't copy or modify the official DeepSeek Harness source. Before submitting, run `npm start` and make sure the first-launch setup and startup still work.
 
 ## License
 

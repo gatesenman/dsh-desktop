@@ -96,6 +96,36 @@ npm run dist     # 构建当前平台安装包
 
 推送 `v*` 标签会触发 GitHub Actions 在 macOS / Windows / Linux 三平台构建并发布 Release。
 
+## 技术栈
+
+- **Electron 43**（主进程 `src/main.js`，渲染进程开启 context isolation、关闭 Node 集成）
+- **electron-builder 26**：macOS dmg/zip、Windows NSIS、Linux AppImage/deb
+- **electron-updater**：通过 GitHub Releases 自动更新
+- 打包前由 `build/prepare-node-runtime.js` 下载并内置 Node.js 24.8.0 运行时
+- 内嵌官方 npm 包 `@deepseek-ai/dsh` 的 `dsh web` 服务
+- 原生 HTML/JS 页面（安装引导、启动页、收件箱、快捷任务、设置、日志），无前端框架
+- GitHub Actions（`.github/workflows/release.yml`）：推送 `v*` 标签后三平台构建发布
+
+## 项目结构
+
+```text
+dsh-desktop/
+├── src/
+│   ├── main.js            # 主进程：安装 / 启动 dsh、托盘、快捷键、任务、备份、诊断、更新
+│   ├── preload.js         # 渲染进程安全桥（contextBridge）
+│   ├── setup.html/.js     # 首次启动安装引导
+│   ├── splash.html        # 启动页
+│   ├── inbox.html/.js     # 智能体收件箱与定时任务
+│   ├── quick.html/.js     # 全局快捷任务输入条
+│   ├── settings.html/.js  # 设置
+│   └── logs.html/.js      # 日志查看
+├── build/
+│   ├── icon.png / icon.svg
+│   └── prepare-node-runtime.js   # 打包前准备内置 Node.js 运行时
+├── assets/                # README 截图
+└── .github/workflows/release.yml
+```
+
 ## 数据目录
 
 Node.js 运行时、dsh 版本化安装目录、任务记录、日志与状态文件保存在应用用户数据目录：
@@ -105,6 +135,10 @@ Node.js 运行时、dsh 版本化安装目录、任务记录、日志与状态�
 | macOS | `~/Library/Application Support/dsh-desktop` |
 | Windows | `%APPDATA%/dsh-desktop` |
 | Linux | `~/.config/dsh-desktop` |
+
+## 参与贡献
+
+欢迎提交 Issue 和 Pull Request。本项目只做桌面外壳的外围增强，请不要修改或复制官方 DeepSeek Harness 的源码；提交前请用 `npm start` 在本机跑通首次安装与启动流程。
 
 ## 许可证
 
