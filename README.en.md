@@ -53,7 +53,7 @@ The installer bundles a Node.js runtime, so first-time setup succeeds even offli
 
 - **dsh version pinning with one-click rollback**: each version installs into its own directory; upgrades install into a new directory and must pass a `dsh --version` preflight before switching; the previous version is kept, the app automatically rolls back if the service fails to start after an upgrade, and manual rollback is available anytime from the tray or settings.
 - **One-click backup/restore**: packs the DSH data directory (sessions, settings, credentials) and desktop preferences into a single `tar.gz`; restore asks for confirmation and validates archive paths for safety, then restarts the service. Backups contain API credentials — keep them safe.
-- **Environment doctor**: generates a diagnostic report in one click (app/system/Node/dsh versions, service and port status, data-directory read/write, free disk space, proxy and npm/DeepSeek API reachability) that you can copy for troubleshooting; it contains no API keys or other sensitive values and uploads nothing.
+- **Environment doctor**: generates a diagnostic report in one click (app/system/Node/dsh versions, service and port status, data-directory read/write, free disk space, proxy and npm/DeepSeek API reachability) that you can copy for troubleshooting; it contains no API keys or other sensitive values and uploads nothing. 1.10 adds a first-run diagnostics page that can export a Markdown/JSON report when dsh is not running, with tokens redacted.
 - **Update strategy**: manual or automatic dsh updates; the app itself auto-updates via GitHub Releases (a jittered check shortly after startup, every 6 hours, and again after waking from sleep).
 
 ### Desktop experience
@@ -65,6 +65,10 @@ The installer bundles a Node.js runtime, so first-time setup succeeds even offli
 - **Original artwork**: the app and tray icons are an originally drawn fox character, with no third-party trademark infringement risk.
 
 ## Screenshots
+
+**First-run diagnostics** (available when dsh is not running; exported reports redact tokens):
+
+![First-run diagnostics page](docs/screenshots/first-run-diagnostics.png)
 
 **Main window** (embedded official Web UI, immersive frameless design):
 
