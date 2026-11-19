@@ -1,6 +1,6 @@
 'use strict'
 
-const { app, BrowserWindow, Menu, Notification, Tray, clipboard, dialog, globalShortcut, ipcMain, shell, nativeImage, nativeTheme, powerMonitor } = require('electron')
+const { app, BrowserWindow, Menu, Notification, Tray, clipboard, dialog, globalShortcut, ipcMain, shell, nativeImage, nativeTheme, powerMonitor, session } = require('electron')
 const { spawn, spawnSync } = require('child_process')
 const fs = require('fs')
 const http = require('http')
@@ -8,6 +8,7 @@ const https = require('https')
 const net = require('net')
 const os = require('os')
 const path = require('path')
+const { isAllowedExternalUrl, isLocalAppUrl, secureWebPreferences, isTrustedIpcSender } = require('./security')
 
 const DSH_PACKAGE = '@deepseek-ai/dsh'
 const FALLBACK_NODE_VERSION = '24.8.0'
@@ -653,15 +654,28 @@ function stopServer() {
 /** Hardens a window: external links open in the browser, no webviews, minimal permissions. */
 function secureWindow(win) {
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://') || url.startsWith('http://')) shell.openExternal(url)
+    if (isAllowedExternalUrl(url, serverPort)) shell.openExternal(url)
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (e, url) => {
-    if (url.startsWith('file://') || url.startsWith(`http://127.0.0.1:${serverPort}`)) return
+    if (isLocalAppUrl(url, serverPort)) return
     e.preventDefault()
-    if (url.startsWith('https://') || url.startsWith('http://')) shell.openExternal(url)
+    if (isAllowedExternalUrl(url, serverPort)) shell.openExternal(url)
   })
   win.webContents.on('will-attach-webview', (e) => e.preventDefault())
+}
+
+function installSessionGuards() {
+  const ses = session.defaultSession
+  ses.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false)
+  })
+}
+
+function assertTrustedIpc(event) {
+  if (!isTrustedIpcSender(event, serverPort)) {
+    throw new Error('Blocked IPC from an untrusted frame')
+  }
 }
 
 function createSetupWindow() {
@@ -671,11 +685,7 @@ function createSetupWindow() {
     resizable: false,
     backgroundColor: '#0b1020',
     icon: path.join(__dirname, 'icon.png'),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    webPreferences: secureWebPreferences({ preload: path.join(__dirname, 'preload.js') }),
   })
   setupWin.setMenuBarVisibility(false)
   secureWindow(setupWin)
@@ -734,10 +744,7 @@ function createMainWindow({ splash = false } = {}) {
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     titleBarOverlay: isMac ? undefined : overlayColors(),
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    webPreferences: secureWebPreferences(),
   })
   if (saved.maximized) mainWin.maximize()
   mainWin.setMenuBarVisibility(false)
@@ -845,11 +852,7 @@ function createSettingsWindow() {
     backgroundColor: themeBackground(),
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    webPreferences: secureWebPreferences({ preload: path.join(__dirname, 'preload.js') }),
   })
   settingsWin.setMenuBarVisibility(false)
   secureWindow(settingsWin)
@@ -871,11 +874,7 @@ function createLogsWindow() {
     backgroundColor: themeBackground(),
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    webPreferences: secureWebPreferences({ preload: path.join(__dirname, 'preload.js') }),
   })
   logsWin.setMenuBarVisibility(false)
   secureWindow(logsWin)
@@ -1398,11 +1397,7 @@ function createInboxWindow() {
     backgroundColor: themeBackground(),
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    webPreferences: secureWebPreferences({ preload: path.join(__dirname, 'preload.js') }),
   })
   inboxWin.setMenuBarVisibility(false)
   secureWindow(inboxWin)
@@ -1430,11 +1425,7 @@ function toggleQuickWindow() {
     skipTaskbar: true,
     show: false,
     backgroundColor: themeBackground(),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    webPreferences: secureWebPreferences({ preload: path.join(__dirname, 'preload.js') }),
   })
   secureWindow(quickWin)
   quickWin.loadFile(path.join(__dirname, 'quick.html'))
@@ -1578,6 +1569,7 @@ let booting = false
 async function boot() {
   if (booting) return
   booting = true
+  installSessionGuards()
   const firstRun = !dshEntry()
   if (firstRun) {
     if (!setupWin || setupWin.isDestroyed()) createSetupWindow()
@@ -1619,7 +1611,8 @@ ipcMain.handle('get-settings', () => ({
   appVersion: app.getVersion(),
   dataDir: userDir(),
 }))
-ipcMain.handle('set-settings', (_e, settings) => {
+ipcMain.handle('set-settings', (e, settings) => {
+  assertTrustedIpc(e)
   const merged = { ...readSettings(), ...settings }
   writeSettings(merged)
   applyLoginItem(merged)
