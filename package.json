@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "description": "Unofficial desktop app for DeepSeek Harness (dsh) — auto-installs and embeds the dsh Web UI",
   "main": "src/main.js",
   "author": "gatesenman <gaosichun@hotmail.com>",
@@ -15,7 +15,7 @@
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
-    "test": "node --test test/security.test.js test/a11y-chrome.test.js",
+    "test": "node --test test/security.test.js test/a11y-chrome.test.js test/diagnostics.test.js",
     "test:e2e": "node test/electron-main-window.mjs"
   },
   "devDependencies": {
@@ -31,7 +31,10 @@
     "productName": "DSH Desktop",
     "beforePack": "build/prepare-node-runtime.js",
     "extraResources": [
-      { "from": "node-runtime/${os}-${arch}", "to": "node-runtime" }
+      {
+        "from": "node-runtime/${os}-${arch}",
+        "to": "node-runtime"
+      }
     ],
     "files": [
       "src/**/*",
@@ -47,14 +50,31 @@
     ],
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] },
-        { "target": "zip", "arch": ["x64", "arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "category": "public.app-category.developer-tools"
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
@@ -63,8 +83,18 @@
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "category": "Development"
     }
