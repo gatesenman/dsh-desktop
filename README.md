@@ -65,6 +65,10 @@ DSH Desktop 将官方发布的 [`@deepseek-ai/dsh`](https://github.com/deepseek-
 
 ## 界面预览
 
+**首次运行诊断**（dsh 尚未启动时也可打开，导出报告会脱敏令牌）：
+
+![首次运行诊断页](docs/screenshots/first-run-diagnostics.png)
+
 **主窗口**（内嵌官方 Web UI，沉浸式无边框）：
 
 ![主窗口](assets/main-window.png)

@@ -66,6 +66,10 @@ The installer bundles a Node.js runtime, so first-time setup succeeds even offli
 
 ## Screenshots
 
+**First-run diagnostics** (available when dsh is not running; exported reports redact tokens):
+
+![First-run diagnostics page](docs/screenshots/first-run-diagnostics.png)
+
 **Main window** (embedded official Web UI, immersive frameless design):
 
 ![Main window](assets/main-window.png)
