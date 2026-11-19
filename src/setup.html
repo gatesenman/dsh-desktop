@@ -6,6 +6,7 @@
   <title>DSH Desktop</title>
   <style>
     :root {
+      --focus-ring: #fb923c;
       --accent: #fb923c;
       --accent2: #f43f5e;
       --accent3: #a78bfa;
@@ -225,6 +226,17 @@
     @media (prefers-reduced-motion: reduce) {
       .stage img, .ring, .orbit, .halo, .step.active .dot, #bar, #bar::after, .aurora, .p, h1 { animation: none; }
       .ring, .orbit, .halo, .p { display: none; }
+    }
+  
+    /* Keyboard focus only — do not show a ring on pointer click. */
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 2px solid var(--focus-ring, var(--accent, #2B6CEA));
+      outline-offset: 2px;
+    }
+    .switch input:focus-visible + .slider {
+      outline: 2px solid var(--focus-ring, var(--accent, #2B6CEA));
+      outline-offset: 3px;
     }
   </style>
 </head>
