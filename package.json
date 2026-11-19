@@ -15,7 +15,7 @@
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
-    "test": "node --test test/security.test.js",
+    "test": "node --test test/security.test.js test/a11y-chrome.test.js",
     "test:e2e": "node test/electron-main-window.mjs"
   },
   "devDependencies": {

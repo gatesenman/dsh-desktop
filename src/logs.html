@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; img-src 'self'" />
   <title>控制台日志 — DSH Desktop</title>
   <style>
-    :root { --accent: #2B6CEA; }
+    :root { --focus-ring: #2B6CEA; --accent: #2B6CEA; }
     body {
       margin: 0;
       font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -42,6 +42,17 @@
       white-space: pre-wrap;
       word-break: break-all;
       user-select: text;
+    }
+  
+    /* Keyboard focus only — do not show a ring on pointer click. */
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 2px solid var(--focus-ring, var(--accent, #2B6CEA));
+      outline-offset: 2px;
+    }
+    .switch input:focus-visible + .slider {
+      outline: 2px solid var(--focus-ring, var(--accent, #2B6CEA));
+      outline-offset: 3px;
     }
   </style>
 </head>

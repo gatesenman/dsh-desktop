@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; img-src 'self'" />
   <title>DSH Desktop</title>
   <style>
-    :root { color-scheme: light dark; --accent: #fb923c; --accent2: #f43f5e; --accent3: #a78bfa; }
+    :root { color-scheme: light dark; --focus-ring: #c2410c; --accent: #fb923c; --accent2: #f43f5e; --accent3: #a78bfa; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
     body {
       display: grid;
@@ -44,12 +44,13 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .mark { width: 72px; height: 72px; border-radius: 18px; animation: breathe 1.9s ease-in-out infinite; box-shadow: 0 6px 26px rgba(251, 146, 60, 0.28); }
     .title { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
-    .hint { margin: -8px 0 0; font-size: 12px; color: #77797e; }
+    .hint { margin: -8px 0 0; font-size: 12px; color: #5c5f66; }
     .track { width: 176px; height: 3px; overflow: hidden; border-radius: 99px; background: rgba(20, 21, 24, 0.09); }
     .bar { width: 42%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent2)); animation: travel 1.25s ease-in-out infinite; box-shadow: 0 0 8px rgba(251, 146, 60, 0.6); }
     @keyframes breathe { 0%, 100% { transform: scale(0.97); opacity: 0.88; } 50% { transform: scale(1); opacity: 1; } }
     @keyframes travel { 0% { transform: translateX(-105%); } 100% { transform: translateX(345%); } }
     @media (prefers-color-scheme: dark) {
+      :root, body { --focus-ring: #fb923c; }
       body { background: #1a1b1e; color: #e6edf3; }
       .hint { color: #9ca0a8; }
       .track { background: rgba(255, 255, 255, 0.11); }
@@ -59,6 +60,17 @@
       .mark, .bar, .halo, .glow { animation: none; }
       .halo, .glow { display: none; }
       .bar { width: 100%; opacity: 0.6; }
+    }
+  
+    /* Keyboard focus only — do not show a ring on pointer click. */
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 2px solid var(--focus-ring, var(--accent, #2B6CEA));
+      outline-offset: 2px;
+    }
+    .switch input:focus-visible + .slider {
+      outline: 2px solid var(--focus-ring, var(--accent, #2B6CEA));
+      outline-offset: 3px;
     }
   </style>
 </head>
