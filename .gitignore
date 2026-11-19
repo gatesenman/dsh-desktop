@@ -4,3 +4,4 @@ node-runtime/
 .node-cache/
 *.log
 .DS_Store
+test-results/

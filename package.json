@@ -14,11 +14,14 @@
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win"
+    "dist:win": "electron-builder --win",
+    "test": "node --test test/security.test.js",
+    "test:e2e": "node test/electron-main-window.mjs"
   },
   "devDependencies": {
     "electron": "^43.3.0",
-    "electron-builder": "^26.14.0"
+    "electron-builder": "^26.14.0",
+    "playwright-core": "^1.56.1"
   },
   "dependencies": {
     "electron-updater": "^6.8.0"
