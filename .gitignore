@@ -4,3 +4,16 @@ node-runtime/
 .node-cache/
 *.log
 .DS_Store
+
+# Additional hygiene
+Thumbs.db
+.env
+.env.local
+.env.*.local
+target/
+logs/
+.venv/
+__pycache__/
+coverage/
+!.env.example
+!.env.example.*
