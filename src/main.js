@@ -533,32 +533,77 @@ function waitForServer(port, timeoutMs = 120000) {
 const CRASH_RESTART_LIMIT = 3
 const STABLE_UPTIME_MS = 60000
 let crashRestarts = 0
+/** Auth token printed by `dsh web` as http://127.0.0.1:port/?token=... */
+let serverAuthToken = null
+
+function redactDshLog(text) {
+  return String(text).replace(/([?&]token=)[^\s&#]+/gi, '$1***')
+}
+
+function extractDshWebToken(text) {
+  const m = String(text).match(/https?:\/\/127\.0\.0\.1:\d+\/?\?token=([^\s&#]+)/i)
+  return m ? decodeURIComponent(m[1]) : null
+}
+
+function dshWebUrl(port = serverPort) {
+  const base = `http://127.0.0.1:${port}/`
+  return serverAuthToken ? `${base}?token=${encodeURIComponent(serverAuthToken)}` : base
+}
+
+function loadMainWindow() {
+  if (mainWin && !mainWin.isDestroyed()) mainWin.loadURL(dshWebUrl())
+}
 
 async function startServer(nodeDir) {
   const entry = dshEntry()
   if (!entry) throw new Error('未找到 dsh，请重启应用重新安装')
   serverPort = await freePort()
+  serverAuthToken = null
   setStep(4)
   setStatus('启动 dsh web 服务...')
   log(`启动服务：dsh web --port ${serverPort}`)
-  serverProc = spawn(nodeBin(nodeDir), [entry, 'web', '--port', String(serverPort)], {
+  let outputBuf = ''
+  let resolveToken
+  const tokenReady = new Promise((resolve) => {
+    resolveToken = resolve
+  })
+  const onOutput = (chunk) => {
+    const text = chunk.toString()
+    outputBuf = (outputBuf + text).slice(-8000)
+    const token = extractDshWebToken(outputBuf)
+    if (token && !serverAuthToken) {
+      serverAuthToken = token
+      resolveToken(token)
+    }
+    const trimmed = text.trim()
+    if (trimmed) log(redactDshLog(trimmed))
+  }
+  serverProc = spawn(nodeBin(nodeDir), [entry, 'web', '--port', String(serverPort), '--no-open'], {
     env: envWithNode(nodeDir),
     cwd: workspaceDir() || undefined,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: !isWin,
   })
-  serverProc.stdout.on('data', (b) => log(b.toString().trim()))
-  serverProc.stderr.on('data', (b) => log(b.toString().trim()))
+  serverProc.stdout.on('data', onOutput)
+  serverProc.stderr.on('data', onOutput)
   const proc = serverProc
   const startedAt = Date.now()
   serverProc.on('exit', (code) => {
-    if (serverProc === proc) serverProc = null
+    if (serverProc === proc) {
+      serverProc = null
+      if (!serverAuthToken) resolveToken(null)
+    }
     if (!quitting && !proc.expectedExit) {
       if (Date.now() - startedAt > STABLE_UPTIME_MS) crashRestarts = 0
       handleServerCrash(code)
     }
   })
   await waitForServer(serverPort)
+  await Promise.race([
+    tokenReady,
+    new Promise((resolve) => setTimeout(resolve, 8000)),
+  ])
+  if (!serverAuthToken) log('未从 dsh web 输出中解析到访问令牌，窗口可能提示需要认证')
   log('服务已就绪')
 }
 
@@ -572,7 +617,7 @@ async function handleServerCrash(code) {
   log(`dsh web 服务意外退出（退出码 ${code}），自动重启（第 ${crashRestarts}/${CRASH_RESTART_LIMIT} 次）...`)
   try {
     await startServer(activeNodeDir)
-    if (mainWin && !mainWin.isDestroyed()) mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
+    loadMainWindow()
     log('服务已自动恢复')
   } catch (e) {
     dialog.showErrorBox('dsh web 服务重启失败', e.message)
@@ -747,7 +792,7 @@ function createMainWindow({ splash = false } = {}) {
     mainWin.webContents.executeJavaScript(THEME_PROBE).catch(() => {})
   })
   if (splash) mainWin.loadFile(path.join(__dirname, 'splash.html'))
-  else mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
+  else mainWin.loadURL(dshWebUrl())
   secureWindow(mainWin)
   const saveBounds = () => {
     if (!mainWin || mainWin.isDestroyed() || mainWin.isMinimized()) return
@@ -876,7 +921,7 @@ async function manualDshUpdate() {
         throw e
       }
     }
-    if (mainWin) mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
+    if (mainWin) mainWin.loadURL(dshWebUrl())
     sendUpdateEvent({ phase: 'done', version: readState().dshVersion })
     updateTray()
     return { status: 'updated', version: readState().dshVersion }
@@ -898,7 +943,7 @@ async function restartService() {
     log('手动重启服务...')
     stopServer()
     await startServer(activeNodeDir)
-    if (mainWin && !mainWin.isDestroyed()) mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
+    loadMainWindow()
     log('服务重启完成')
     return { status: 'restarted' }
   } catch (e) {
@@ -1432,7 +1477,7 @@ function trayMenuTemplate() {
     { label: '查看控制台日志', click: createLogsWindow },
     { label: '重启服务', click: () => restartService() },
     { label: '打开终端', click: openTerminal },
-    { label: '在浏览器中打开', click: () => shell.openExternal(`http://127.0.0.1:${serverPort}/`) },
+    { label: '在浏览器中打开', click: () => shell.openExternal(dshWebUrl()) },
     { type: 'separator' },
     {
       label: '退出',
@@ -1547,7 +1592,7 @@ async function boot() {
     activeNodeDir = nodeDir
     Menu.setApplicationMenu(null)
     if (!tray) createTray()
-    if (mainWin && !mainWin.isDestroyed()) mainWin.loadURL(`http://127.0.0.1:${serverPort}/`)
+    if (mainWin && !mainWin.isDestroyed()) mainWin.loadURL(dshWebUrl())
     else createMainWindow()
     if (process.env.DSH_DESKTOP_SETTINGS === '1') createSettingsWindow()
     if (process.env.DSH_DESKTOP_INBOX === '1') createInboxWindow()
