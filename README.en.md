@@ -24,13 +24,13 @@ DSH Desktop packages the officially published [`@deepseek-ai/dsh`](https://githu
 
 ## Download
 
-Grab the installer for your platform from [Releases](https://github.com/gatesenman/dsh-desktop/releases):
+Grab the installer for your platform from [Releases v1.9.1](https://github.com/gatesenman/dsh-desktop/releases/tag/v1.9.1). Current exact names:
 
 | Platform | Installer | Notes |
 | --- | --- | --- |
-| macOS | `.dmg` | x64 / Apple Silicon (arm64) |
-| Windows | `.exe` | NSIS installer |
-| Linux | `.AppImage` / `.deb` | x64 |
+| macOS | [DSH-Desktop-1.9.1.dmg](https://github.com/gatesenman/dsh-desktop/releases/download/v1.9.1/DSH-Desktop-1.9.1.dmg) / [DSH-Desktop-1.9.1-arm64.dmg](https://github.com/gatesenman/dsh-desktop/releases/download/v1.9.1/DSH-Desktop-1.9.1-arm64.dmg) | x64 / Apple Silicon |
+| Windows | [DSH-Desktop-Setup-1.9.1.exe](https://github.com/gatesenman/dsh-desktop/releases/download/v1.9.1/DSH-Desktop-Setup-1.9.1.exe) | NSIS installer |
+| Linux | [DSH-Desktop-1.9.1.AppImage](https://github.com/gatesenman/dsh-desktop/releases/download/v1.9.1/DSH-Desktop-1.9.1.AppImage) / [dsh-desktop_1.9.1_amd64.deb](https://github.com/gatesenman/dsh-desktop/releases/download/v1.9.1/dsh-desktop_1.9.1_amd64.deb) | x64 |
 
 The installer bundles a Node.js runtime, so first-time setup succeeds even offline or on slow networks.
 

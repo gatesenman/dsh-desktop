@@ -24,13 +24,13 @@ DSH Desktop 将官方发布的 [`@deepseek-ai/dsh`](https://github.com/deepseek-
 
 ## 下载安装
 
-从 [Releases](https://github.com/gatesenman/dsh-desktop/releases) 下载对应平台的安装包：
+从 [Releases v1.9.1](https://github.com/gatesenman/dsh-desktop/releases/tag/v1.9.1) 下载对应平台的安装包。当前确切文件名：
 
 | 平台 | 安装包 | 说明 |
 | --- | --- | --- |
-| macOS | `.dmg` | x64 / Apple Silicon (arm64) |
-| Windows | `.exe` | NSIS 安装程序 |
-| Linux | `.AppImage` / `.deb` | x64 |
+| macOS | [DSH-Desktop-1.9.1.dmg](https://github.com/gatesenman/dsh-desktop/releases/download/v1.9.1/DSH-Desktop-1.9.1.dmg) / [DSH-Desktop-1.9.1-arm64.dmg](https://github.com/gatesenman/dsh-desktop/releases/download/v1.9.1/DSH-Desktop-1.9.1-arm64.dmg) | x64 / Apple Silicon |
+| Windows | [DSH-Desktop-Setup-1.9.1.exe](https://github.com/gatesenman/dsh-desktop/releases/download/v1.9.1/DSH-Desktop-Setup-1.9.1.exe) | NSIS 安装程序 |
+| Linux | [DSH-Desktop-1.9.1.AppImage](https://github.com/gatesenman/dsh-desktop/releases/download/v1.9.1/DSH-Desktop-1.9.1.AppImage) / [dsh-desktop_1.9.1_amd64.deb](https://github.com/gatesenman/dsh-desktop/releases/download/v1.9.1/dsh-desktop_1.9.1_amd64.deb) | x64 |
 
 安装包内置 Node.js 运行时，弱网 / 离线环境同样可完成首次安装。
 
